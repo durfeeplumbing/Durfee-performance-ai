@@ -1,0 +1,3 @@
+export type JobCostInput={revenue:number;materials:number;laborHours:number;laborBurdenPerHour:number;equipment:number;permits:number;subcontractors:number;other:number};
+export function jobCosting(j:JobCostInput){const labor=j.laborHours*j.laborBurdenPerHour;const totalCost=j.materials+labor+j.equipment+j.permits+j.subcontractors+j.other;const grossProfit=j.revenue-totalCost;const grossProfitPercent=j.revenue?grossProfit/j.revenue*100:0;return{labor,totalCost,grossProfit,grossProfitPercent}}
+export function jobCostGuard(j:JobCostInput,gpFloor=50){const result=jobCosting(j);return{...result,status:result.grossProfitPercent>=gpFloor?'healthy':'review',varianceToFloor:result.grossProfitPercent-gpFloor}}

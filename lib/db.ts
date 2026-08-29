@@ -1,4 +1,4 @@
-import { Pool, type QueryResultRow } from 'pg';
+import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 
 declare global { var durfeeDbPool: Pool | undefined }
 
@@ -17,7 +17,7 @@ export async function query<T extends QueryResultRow>(text:string,values:unknown
   return db().query<T>(text,values);
 }
 
-export async function transaction<T>(work:(client:Awaited<ReturnType<Pool['connect']>>)=>Promise<T>){
+export async function transaction<T>(work:(client:PoolClient)=>Promise<T>){
   const client=await db().connect();
   try{await client.query('BEGIN');const result=await work(client);await client.query('COMMIT');return result}catch(error){await client.query('ROLLBACK');throw error}finally{client.release()}
 }

@@ -1,6 +1,6 @@
 # Durfee Performance AI
 
-AI-powered operating system for Durfee Plumbing & Heating: profitability, dispatch, technician/CSR performance, pricing intelligence, marketing, and management reporting.
+AI-powered standalone operating system for Durfee Plumbing & Heating: profitability, dispatch, technician/CSR performance, pricing intelligence, marketing, and management reporting.
 
 ## Phase 1
 - Owner command center
@@ -9,12 +9,14 @@ AI-powered operating system for Durfee Plumbing & Heating: profitability, dispat
 - Job profitability and gross-profit guardrails
 - Smart dispatch recommendations
 - AI price-book engine with actual-time feedback
-- ServiceTitan integration layer
 - Role-based access controls
 - Daily profitability and billing exception reports
+- Standalone operational database and workflow engine
 
 ## Planned integrations
-ServiceTitan, supplier pricing feeds, phone/SMS, accounting/banking, payroll, marketing/ad platforms, reviews, and GPS/field data.
+Supplier pricing feeds, phone/SMS, accounting/banking, payroll, marketing/ad platforms, reviews, and GPS/field data.
+
+**ServiceTitan integration is intentionally deferred.** The platform will remain integration-ready through isolated adapters, but no ServiceTitan API or synchronization work is part of the current build phase.
 
 ## Architecture
 Next.js + TypeScript application, PostgreSQL-compatible data layer, server-side integration adapters, role-based authorization, and immutable audit logging for sensitive operational and financial changes.

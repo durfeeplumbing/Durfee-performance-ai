@@ -1,11 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
+const fallbackUrl='https://ksbmdgwiztlbthagzhpg.supabase.co';
+const fallbackPublishableKey='sb_publishable_Upwje6AofSbaZmFpPe8PIg_SsjATBk8';
+
 export async function createSupabaseServerClient(){
   const cookieStore=await cookies();
-  const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if(!url||!key)throw new Error('Supabase authentication is not configured');
+  const url=process.env.NEXT_PUBLIC_SUPABASE_URL||fallbackUrl;
+  const key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY||fallbackPublishableKey;
   return createServerClient(url,key,{
     cookies:{
       getAll(){return cookieStore.getAll()},

@@ -1,0 +1,5 @@
+export type TimeEntry={jobId:string;technicianId:string;startedAt:string;endedAt?:string;type:'travel'|'work'|'break'};
+export type MaterialUsage={jobId:string;sku:string;description:string;quantity:number;unitCost:number;source:'truck'|'warehouse'|'purchase'};
+export function hours(entry:TimeEntry){if(!entry.endedAt)return 0;return Math.max(0,(new Date(entry.endedAt).getTime()-new Date(entry.startedAt).getTime())/3600000)}
+export function materialTotal(items:MaterialUsage[]){return items.reduce((sum,i)=>sum+i.quantity*i.unitCost,0)}
+export function fieldCloseGuard(time:TimeEntry[],materials:MaterialUsage[],notes:string,photos:number){const issues:string[]=[];if(!time.some(t=>t.type==='work'&&t.endedAt))issues.push('Completed work time is required');if(!notes.trim())issues.push('Job notes are required');if(photos<1)issues.push('At least one job photo is required');if(materials.some(m=>m.quantity<=0))issues.push('Material quantities must be positive');return{allowed:issues.length===0,issues}}

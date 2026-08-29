@@ -1,0 +1,4 @@
+export type PriceInput={materialCost:number;laborHours:number;laborRate:number;overhead:number;targetGp:number};
+export function buildPrice(i:PriceInput){const cost=i.materialCost+i.laborHours*i.laborRate+i.overhead;if(i.targetGp<0||i.targetGp>=100)throw new Error('targetGp must be >= 0 and < 100');const price=cost/(1-i.targetGp/100);return{cost,price,grossProfit:price-cost,grossProfitPercent:i.targetGp};}
+export type ActualJob={estimatedHours:number;actualHours:number;currentPrice:number;actualCost:number};
+export function learningSignal(j:ActualJob,targetGp=50){const timeVariance=j.actualHours-j.estimatedHours;const actualGp=j.currentPrice?((j.currentPrice-j.actualCost)/j.currentPrice)*100:0;return{timeVariance,actualGp,needsReview:Math.abs(timeVariance)>=1||actualGp<targetGp,recommendation:actualGp<targetGp?'Review labor allowance or price before changing the price book.':'No margin adjustment required.'};}

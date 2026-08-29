@@ -1,0 +1,4 @@
+export type Payment={amount:number;method:'card'|'ach'|'check'|'cash'|'financing'|'other';receivedAt:string;reference?:string};
+export function paymentSummary(contractTotal:number,payments:Payment[]){const paid=payments.reduce((sum,p)=>sum+p.amount,0);const balance=Math.max(0,contractTotal-paid);return{contractTotal,paid,balance,paidInFull:balance===0}}
+export function requiredDeposit(contractTotal:number,depositPercent=60){if(depositPercent<0||depositPercent>100)throw new Error('depositPercent must be between 0 and 100');return contractTotal*(depositPercent/100)}
+export function depositStatus(contractTotal:number,payments:Payment[],depositPercent=60){const required=requiredDeposit(contractTotal,depositPercent);const received=payments.reduce((sum,p)=>sum+p.amount,0);return{required,received,satisfied:received>=required,remaining:Math.max(0,required-received)}}

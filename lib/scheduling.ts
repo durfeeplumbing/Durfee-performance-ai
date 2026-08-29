@@ -1,0 +1,3 @@
+export type Appointment={jobId:string;technicianId:string;start:string;end:string;status:'scheduled'|'dispatched'|'arrived'|'completed'};
+export function hasConflict(candidate:Appointment,existing:Appointment[]){const start=new Date(candidate.start).getTime(),end=new Date(candidate.end).getTime();return existing.some(a=>a.technicianId===candidate.technicianId&&start<new Date(a.end).getTime()&&end>new Date(a.start).getTime())}
+export function scheduleGuard(candidate:Appointment,existing:Appointment[]){const issues:string[]=[];if(new Date(candidate.end)<=new Date(candidate.start))issues.push('End time must be after start time');if(hasConflict(candidate,existing))issues.push('Technician has a scheduling conflict');return{allowed:issues.length===0,issues}}

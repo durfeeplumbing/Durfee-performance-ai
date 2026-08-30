@@ -3,13 +3,5 @@ import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireCurrentUser } from '@/lib/session';
 
-export async function createCustomer(formData:FormData){
-  const user=await requireCurrentUser();
-  if(!['owner','manager','csr_dispatch'].includes(user.role))throw new Error('Not authorized');
-  const name=String(formData.get('name')??'').trim();
-  if(!name)throw new Error('Customer name is required');
-  const supabase=await createSupabaseServerClient();
-  const {error}=await supabase.from('customers').insert({name,phone:String(formData.get('phone')??'').trim()||null,email:String(formData.get('email')??'').trim()||null,service_address:String(formData.get('service_address')??'').trim()||null});
-  if(error)throw new Error('Customer could not be created');
-  revalidatePath('/customers');
-}
+async function verifyAddress(raw:string){const address=raw.trim();if(!address)throw new Error('Service address is required for routing');const token=process.env.MAPBOX_ACCESS_TOKEN;if(!token)throw new Error('Address verification is not configured');const url=`https://api.mapbox.com/search/geocode/v6/forward?q=${encodeURIComponent(address)}&country=US&limit=1&access_token=${encodeURIComponent(token)}`;const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error('Address verification service is unavailable');const body=await r.json(),f=body?.features?.[0],coords=f?.geometry?.coordinates;if(!f||!Array.isArray(coords)||coords.length<2)throw new Error('Address could not be verified. Check the street, town, state and ZIP.');const type=f.properties?.feature_type,confidence=f.properties?.match_code?.confidence;if(type!=='address')throw new Error('Please enter a complete street address, including street number, town, state and ZIP.');if(confidence&&['low'].includes(confidence))throw new Error('Address match is uncertain. Check the street number, town, state and ZIP.');const normalized=f.properties?.full_address||f.place_name||address;return {address:normalized,longitude:Number(coords[0]),latitude:Number(coords[1])};}
+export async function createCustomer(formData:FormData){const user=await requireCurrentUser();if(!['owner','manager','csr_dispatch'].includes(user.role))throw new Error('Not authorized');const name=String(formData.get('name')??'').trim();if(!name)throw new Error('Customer name is required');const verified=await verifyAddress(String(formData.get('service_address')??''));const supabase=await createSupabaseServerClient();const {error}=await supabase.from('customers').insert({name,phone:String(formData.get('phone')??'').trim()||null,email:String(formData.get('email')??'').trim()||null,service_address:verified.address,latitude:verified.latitude,longitude:verified.longitude});if(error)throw new Error('Customer could not be created');revalidatePath('/customers');revalidatePath('/dispatch');revalidatePath('/dispatch/route-planner');revalidatePath('/dispatch/fleet-optimizer');}

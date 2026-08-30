@@ -1,7 +1,7 @@
-const jobs = [
-  ["8:00 AM", "No Heat", "Dennis", "High", "Assign best HVAC diagnostic tech"],
-  ["10:00 AM", "Water Heater", "Yarmouth", "High", "Prioritize tank/tankless sales skill"],
-  ["12:30 PM", "Leak Repair", "Barnstable", "Normal", "Minimize drive time"],
-  ["2:00 PM", "Boiler Estimate", "Harwich", "High", "Match boiler conversion leader"]
-];
-export default function DispatchPage(){return <main style={{fontFamily:"system-ui",maxWidth:1200,margin:"auto",padding:32}}><h1>Smart Dispatch</h1><p>Rank assignments using skill, geography, availability, conversion and revenue productivity.</p><div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",marginTop:24}}><thead><tr>{["Time","Call","Town","Opportunity","AI Recommendation"].map(x=><th key={x} style={{textAlign:"left",padding:12,borderBottom:"1px solid #ccc"}}>{x}</th>)}</tr></thead><tbody>{jobs.map((r,i)=><tr key={i}>{r.map(x=><td key={x} style={{padding:12,borderBottom:"1px solid #eee"}}>{x}</td>)}</tr>)}</tbody></table></div></main>}
+import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { requireCurrentUser } from '@/lib/session';
+export default async function DispatchPage(){
+  await requireCurrentUser();const supabase=await createSupabaseServerClient();
+  const {data,error}=await supabase.from('jobs').select('id,status,scheduled_start,scheduled_end,revenue,customers(name,service_address),users(name)').in('status',['booked','scheduled','dispatched','on_site']).order('scheduled_start',{ascending:true}).limit(50);const jobs=error?[]:(data??[]);
+  return <main style={{fontFamily:'system-ui',maxWidth:1200,margin:'auto',padding:32}}><h1>Smart Dispatch</h1><p>Live open calls and assignments. AI ranking will recommend—not automatically change—technician assignments.</p>{error&&<p role="alert">Dispatch records could not be loaded.</p>}<div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',marginTop:24}}><thead><tr>{['Time','Customer','Location','Assigned Tech','Status','Opportunity'].map(x=><th key={x} style={{textAlign:'left',padding:12,borderBottom:'1px solid #ccc'}}>{x}</th>)}</tr></thead><tbody>{jobs.map((j:any)=><tr key={j.id}><td style={{padding:12,borderBottom:'1px solid #eee'}}>{j.scheduled_start?new Date(j.scheduled_start).toLocaleString():'Unscheduled'}</td><td style={{padding:12,borderBottom:'1px solid #eee'}}>{j.customers?.name||'—'}</td><td style={{padding:12,borderBottom:'1px solid #eee'}}>{j.customers?.service_address||'—'}</td><td style={{padding:12,borderBottom:'1px solid #eee'}}>{j.users?.name||'Unassigned'}</td><td style={{padding:12,borderBottom:'1px solid #eee'}}>{j.status}</td><td style={{padding:12,borderBottom:'1px solid #eee'}}>{Number(j.revenue??0)>0?'Revenue-bearing job':'Needs estimate / billing value'}</td></tr>)}</tbody></table>{!jobs.length&&!error&&<p style={{marginTop:24}}>No open dispatch calls right now.</p>}</div></main>;
+}

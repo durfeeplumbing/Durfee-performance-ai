@@ -1,23 +1,5 @@
-export type DispatchCandidate = {
-  technicianId: string;
-  skillMatch: number;
-  travelMinutes: number;
-  availableInMinutes: number;
-  conversionRate: number;
-  revenuePerHour: number;
-};
-
-export function dispatchScore(c: DispatchCandidate) {
-  const skill = Math.max(0, Math.min(c.skillMatch, 100)) * 0.35;
-  const travel = Math.max(0, 100 - c.travelMinutes * 2) * 0.20;
-  const availability = Math.max(0, 100 - c.availableInMinutes) * 0.15;
-  const conversion = Math.max(0, Math.min(c.conversionRate, 100)) * 0.20;
-  const productivity = Math.min(c.revenuePerHour / 10, 100) * 0.10;
-  return skill + travel + availability + conversion + productivity;
-}
-
-export function rankTechnicians(candidates: DispatchCandidate[]) {
-  return candidates
-    .map(candidate => ({ ...candidate, score: dispatchScore(candidate) }))
-    .sort((a, b) => b.score - a.score);
-}
+export type DispatchCandidate={technicianId:string;skillMatch:number;travelMinutes:number;availableInMinutes:number;conversionRate:number;revenuePerHour:number;activeJobs?:number;windowRiskMinutes?:number;jobValueFit?:number};
+const clamp=(n:number)=>Math.max(0,Math.min(n,100));
+export function dispatchScore(c:DispatchCandidate){const skill=clamp(c.skillMatch)*.30;const travel=clamp(100-c.travelMinutes*2)*.20;const availability=clamp(100-c.availableInMinutes)*.15;const conversion=clamp(c.conversionRate)*.10;const productivity=clamp(c.revenuePerHour/10)*.08;const workload=clamp(100-(c.activeJobs??0)*20)*.07;const window=clamp(100-(c.windowRiskMinutes??0)*2)*.05;const value=clamp(c.jobValueFit??50)*.05;return skill+travel+availability+conversion+productivity+workload+window+value;}
+export function rankTechnicians(candidates:DispatchCandidate[]){return candidates.map(candidate=>({...candidate,score:dispatchScore(candidate)})).sort((a,b)=>b.score-a.score);}
+export function recommendationReason(c:DispatchCandidate){const reasons:string[]=[];if(c.skillMatch>=80)reasons.push('strong skill fit');if(c.travelMinutes<=20)reasons.push('short travel');if(c.availableInMinutes<=30)reasons.push('available soon');if((c.activeJobs??0)<=1)reasons.push('lighter workload');if((c.windowRiskMinutes??0)<=10)reasons.push('low appointment-window risk');return reasons.length?reasons.join(', '):'balanced operating fit';}

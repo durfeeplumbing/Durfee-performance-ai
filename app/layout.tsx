@@ -6,7 +6,7 @@ import { getCurrentUser } from '@/lib/session';
 import { logout } from '@/app/login/actions';
 
 const nav=[['Dashboard','/dashboard'],['Schedule','/schedule'],['Dispatch','/dispatch'],['Jobs','/jobs'],['Customers','/customers'],['Estimates','/estimates'],['Billing','/billing'],['Price Book','/pricebook'],['Technicians','/team'],['CSR','/csr'],['Inventory','/inventory'],['Daily Report','/reports/daily']];
-const publicPaths=['/login','/setup-owner'];
+const publicPaths=['/login','/setup-owner','/approve/'];
 export const metadata={title:'Durfee Performance AI',description:'Standalone field service management and profitability platform'};
 
 export default async function RootLayout({children}:{children:ReactNode}){

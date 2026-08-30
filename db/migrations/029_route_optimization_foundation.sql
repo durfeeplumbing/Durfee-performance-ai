@@ -1,0 +1,7 @@
+alter table public.customers add column if not exists latitude numeric, add column if not exists longitude numeric;
+alter table public.users add column if not exists start_latitude numeric, add column if not exists start_longitude numeric;
+alter table public.jobs add column if not exists expected_duration_minutes integer check(expected_duration_minutes is null or expected_duration_minutes>0);
+create table if not exists public.dispatch_route_recommendations(id uuid primary key default gen_random_uuid(),route_date date not null,technician_id uuid not null references public.users(id) on delete cascade,job_id uuid not null references public.jobs(id) on delete cascade,sequence_no integer not null check(sequence_no>0),estimated_leg_miles numeric,estimated_leg_minutes integer,reason text,created_at timestamptz not null default now(),created_by uuid references public.users(id),unique(route_date,technician_id,job_id));
+alter table public.dispatch_route_recommendations enable row level security;
+create policy "staff read route recommendations" on public.dispatch_route_recommendations for select to authenticated using(private.current_employee_role() in ('owner','manager','csr_dispatch','technician'));
+create policy "dispatch manage route recommendations" on public.dispatch_route_recommendations for all to authenticated using(private.current_employee_role() in ('owner','manager','csr_dispatch')) with check(private.current_employee_role() in ('owner','manager','csr_dispatch'));

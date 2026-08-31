@@ -49,3 +49,10 @@ export async function syncServiceTitanFinancialData() {
   const memberships = await serviceTitanGetAll('/memberships/v2/tenant/{tenant}/memberships'); await saveResource(supabase, 'memberships', memberships, info);
   revalidatePath('/settings/integrations/servicetitan');
 }
+
+export async function refreshServiceTitanCustomerMappings() {
+  const supabase = await ownerClient();
+  const { error } = await supabase.rpc('refresh_service_titan_customer_mapping_candidates');
+  if (error) throw new Error(`Customer mapping refresh failed: ${error.message}`);
+  revalidatePath('/settings/integrations/servicetitan');
+}

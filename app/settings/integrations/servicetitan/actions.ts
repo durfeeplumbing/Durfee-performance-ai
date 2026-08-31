@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { serviceTitanConnectionInfo, serviceTitanGetAll } from '@/lib/servicetitan';
 
+const STAGING_BATCH_SIZE = 200;
+
 async function ownerClient() {
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -14,8 +16,16 @@ async function ownerClient() {
 }
 
 async function saveResource(supabase: Awaited<ReturnType<typeof ownerClient>>, resource: string, records: unknown[], info: ReturnType<typeof serviceTitanConnectionInfo>) {
-  const { error } = await supabase.rpc('upsert_service_titan_resource', { p_resource: resource, p_records: records, p_environment: info.environment, p_tenant_id: info.tenant });
-  if (error) throw new Error(`${resource} sync failed: ${error.message}`);
+  for (let offset = 0; offset < records.length; offset += STAGING_BATCH_SIZE) {
+    const batch = records.slice(offset, offset + STAGING_BATCH_SIZE);
+    const { error } = await supabase.rpc('upsert_service_titan_resource', {
+      p_resource: resource,
+      p_records: batch,
+      p_environment: info.environment,
+      p_tenant_id: info.tenant,
+    });
+    if (error) throw new Error(`${resource} sync failed at records ${offset + 1}-${offset + batch.length}: ${error.message}`);
+  }
 }
 
 export async function syncServiceTitanReferenceData() {

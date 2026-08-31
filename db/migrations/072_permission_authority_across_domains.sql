@@ -20,6 +20,7 @@ begin
     d:=regexp_replace(d,$re$if\s+v_user\.id\s+is\s+null\s+or\s+v_user\.role\s+not\s+in\s*\([^)]*\)\s+then\s+raise\s+exception\s+'Not authorized';\s*end\s+if;$re$,$rep$if v_user.id is null then raise exception 'Employee identity unavailable'; end if;$rep$,'i');
     d:=regexp_replace(d,$re$if\s+u\.id\s+is\s+null\s+or\s+u\.role\s+not\s+in\s*\([^)]*\)\s+then\s+raise\s+exception\s+'Not authorized';\s*end\s+if;$re$,$rep$if u.id is null then raise exception 'Employee identity unavailable'; end if;$rep$,'i');
     d:=regexp_replace(d,$re$if\s+actor\.id\s+is\s+null\s+or\s+actor\.role\s+not\s+in\s*\([^)]*\)\s+then\s+raise\s+exception\s+'Not authorized';\s*end\s+if;$re$,$rep$if actor.id is null then raise exception 'Employee identity unavailable'; end if;$rep$,'i');
+    d:=regexp_replace(d,$re$if\s+a\.id\s+is\s+null\s+or\s+a\.role\s+not\s+in\s*\([^)]*\)\s+then\s+raise\s+exception\s+'Not authorized';\s*end\s+if;$re$,$rep$if a.id is null then raise exception 'Employee identity unavailable'; end if;$rep$,'i');
 
     -- field_app is permission-authoritative, but non-management field users remain assignment-scoped.
     d:=regexp_replace(d,$re$if\s+v_role='technician'\s+and\s+v_job\.technician_id\s+is\s+distinct\s+from\s+v_actor\s+then\s+raise\s+exception\s+'[^']*';\s*end\s+if;$re$,$rep$if v_job.technician_id is distinct from v_actor and not (private.has_permission('manage_jobs') or private.has_permission('manage_dispatch')) then raise exception 'Field users can only update their assigned jobs'; end if;$rep$,'i');

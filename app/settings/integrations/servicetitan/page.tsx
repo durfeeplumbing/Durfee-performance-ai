@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireCurrentUser } from '@/lib/session';
 import { serviceTitanConfigured } from '@/lib/servicetitan';
-import ServiceTitanSyncButton from './sync-button';
+import ServiceTitanSyncForm from './sync-form';
 import { refreshServiceTitanCustomerMappings, syncServiceTitanCrmData, syncServiceTitanFinancialData, syncServiceTitanJobsData, syncServiceTitanReferenceData } from './actions';
 
 function when(value?: string | null) { return value ? new Date(value).toLocaleString('en-US', { timeZone: 'America/New_York' }) : 'Never'; }
@@ -30,22 +30,52 @@ export default async function ServiceTitanIntegrationPage() {
       {resources.map(resource => <div className="card" key={resource}><strong>{resource.replaceAll('_',' ')} cached</strong><div>{countByResource[resource]}</div></div>)}
       <div className="card"><strong>Last successful sync</strong><div>{when(state?.last_successful_sync)}</div></div>
     </section>
-    <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:24}}>
-      <form action={syncServiceTitanReferenceData}><ServiceTitanSyncButton idleLabel="Sync technicians + business units" /></form>
-      <form action={syncServiceTitanCrmData}><ServiceTitanSyncButton idleLabel="Sync customers + locations" /></form>
-      <form action={syncServiceTitanJobsData}><ServiceTitanSyncButton idleLabel="Sync jobs + appointments" pendingLabel="Syncing jobs + appointments…" /></form>
-      <form action={syncServiceTitanFinancialData}><ServiceTitanSyncButton idleLabel="Sync invoices + payments + memberships" pendingLabel="Syncing financial data…" /></form>
+    <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:24,alignItems:'flex-start'}}>
+      <ServiceTitanSyncForm
+        action={syncServiceTitanReferenceData}
+        idleLabel="Sync technicians + business units"
+        pendingLabel="Syncing technicians + business units…"
+        successTitle="Reference sync complete"
+        successMessage="Technicians and business units are up to date."
+      />
+      <ServiceTitanSyncForm
+        action={syncServiceTitanCrmData}
+        idleLabel="Sync customers + locations"
+        pendingLabel="Syncing customers + locations…"
+        successTitle="Customer sync complete"
+        successMessage="Customers and locations are up to date."
+      />
+      <ServiceTitanSyncForm
+        action={syncServiceTitanJobsData}
+        idleLabel="Sync jobs + appointments"
+        pendingLabel="Syncing jobs + appointments…"
+        successTitle="Jobs sync complete"
+        successMessage="Jobs and appointments are up to date."
+      />
+      <ServiceTitanSyncForm
+        action={syncServiceTitanFinancialData}
+        idleLabel="Sync invoices + payments + memberships"
+        pendingLabel="Syncing financial data…"
+        successTitle="Financial sync complete"
+        successMessage="Invoices, payments, and memberships are up to date."
+      />
       <a href="/api/servicetitan/test" target="_blank" rel="noreferrer">Test connection</a>
     </div>
-    <p><small>When a sync is running, its button is disabled and displays Syncing. When it finishes, the refreshed cached counts and Recent syncs table below confirm the saved records.</small></p>
+    <p><small>Each sync now refreshes this page automatically when it finishes and displays a confirmation screen. The cached totals and Recent syncs section below update without a manual reload.</small></p>
     <h2>Customer mapping review</h2>
     <p>Generate conservative match candidates against existing Durfee AI customers using normalized email and phone. Nothing is merged or created by this action.</p>
-    <div style={{display:'flex',gap:12,flexWrap:'wrap',margin:'12px 0 24px'}}>
+    <div style={{display:'flex',gap:12,flexWrap:'wrap',margin:'12px 0 24px',alignItems:'flex-start'}}>
       <div className="card"><strong>Unmatched</strong><div>{mappingCounts.unmatched ?? 0}</div></div>
       <div className="card"><strong>Candidates</strong><div>{mappingCounts.candidate ?? 0}</div></div>
       <div className="card"><strong>Conflicts</strong><div>{mappingCounts.conflict ?? 0}</div></div>
       <div className="card"><strong>Matched</strong><div>{mappingCounts.matched ?? 0}</div></div>
-      <form action={refreshServiceTitanCustomerMappings}><ServiceTitanSyncButton idleLabel="Refresh customer match candidates" pendingLabel="Refreshing matches…" /></form>
+      <ServiceTitanSyncForm
+        action={refreshServiceTitanCustomerMappings}
+        idleLabel="Refresh customer match candidates"
+        pendingLabel="Refreshing matches…"
+        successTitle="Customer matches refreshed"
+        successMessage="The customer matching review has been updated."
+      />
     </div>
     <p><small>All ServiceTitan imports on this page are staged read-only for comparison before records are mapped into Durfee AI operational tables.</small></p>
     <h2>Recent syncs</h2>

@@ -15,6 +15,15 @@ type PaginatedResponse<T> = {
   data?: T[];
 };
 
+type CachedToken = {
+  token: TokenResponse;
+  expiresAt: number;
+  environment: ServiceTitanEnv;
+  clientId: string;
+};
+
+let cachedToken: CachedToken | null = null;
+
 function config() {
   const appKey = process.env.SERVICETITAN_APP_KEY?.trim();
   const clientId = process.env.SERVICETITAN_CLIENT_ID?.trim();
@@ -44,12 +53,24 @@ export function serviceTitanConnectionInfo() {
 
 export async function getServiceTitanAccessToken() {
   const c = config();
+  const now = Date.now();
+  if (cachedToken && cachedToken.environment === c.env && cachedToken.clientId === c.clientId && cachedToken.expiresAt > now + 60_000) {
+    return cachedToken.token;
+  }
+
   const u = urls(c.env);
   const body = new URLSearchParams({ grant_type: 'client_credentials', client_id: c.clientId, client_secret: c.clientSecret });
   const response = await fetch(u.auth, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body, cache: 'no-store' });
   if (!response.ok) throw new Error(`ServiceTitan OAuth failed (${response.status})`);
   const token = (await response.json()) as TokenResponse;
   if (!token.access_token) throw new Error('ServiceTitan OAuth returned no access token');
+
+  cachedToken = {
+    token,
+    expiresAt: now + Math.max(60, token.expires_in ?? 900) * 1000,
+    environment: c.env,
+    clientId: c.clientId,
+  };
   return token;
 }
 

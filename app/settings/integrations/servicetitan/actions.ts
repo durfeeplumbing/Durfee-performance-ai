@@ -48,3 +48,16 @@ export async function syncServiceTitanCrmData() {
 
   revalidatePath('/settings/integrations/servicetitan');
 }
+
+export async function syncServiceTitanJobsData() {
+  const supabase = await ownerClient();
+  const info = serviceTitanConnectionInfo();
+
+  const jobs = await serviceTitanGetAll('/jpm/v2/tenant/{tenant}/jobs');
+  await saveResource(supabase, 'jobs', jobs, info);
+
+  const appointments = await serviceTitanGetAll('/jpm/v2/tenant/{tenant}/appointments');
+  await saveResource(supabase, 'appointments', appointments, info);
+
+  revalidatePath('/settings/integrations/servicetitan');
+}

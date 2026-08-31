@@ -51,10 +51,10 @@ export function serviceTitanConnectionInfo() {
   return { environment: c.env, tenant: c.tenant };
 }
 
-export async function getServiceTitanAccessToken() {
+export async function getServiceTitanAccessToken(forceRefresh = false) {
   const c = config();
   const now = Date.now();
-  if (cachedToken && cachedToken.environment === c.env && cachedToken.clientId === c.clientId && cachedToken.expiresAt > now + 60_000) {
+  if (!forceRefresh && cachedToken && cachedToken.environment === c.env && cachedToken.clientId === c.clientId && cachedToken.expiresAt > now + 60_000) {
     return cachedToken.token;
   }
 
@@ -74,8 +74,7 @@ export async function getServiceTitanAccessToken() {
   return token;
 }
 
-export async function serviceTitanGet<T = unknown>(path: string): Promise<T> {
-  if (!path.startsWith('/')) throw new Error('ServiceTitan API path must start with /');
+async function serviceTitanFetch(path: string, retryUnauthorized = true) {
   const c = config();
   const u = urls(c.env);
   const token = await getServiceTitanAccessToken();
@@ -83,6 +82,20 @@ export async function serviceTitanGet<T = unknown>(path: string): Promise<T> {
     headers: { Authorization: `Bearer ${token.access_token}`, 'ST-App-Key': c.appKey, Accept: 'application/json' },
     cache: 'no-store',
   });
+  if (response.status === 401 && retryUnauthorized) {
+    cachedToken = null;
+    const refreshed = await getServiceTitanAccessToken(true);
+    return fetch(`${u.api}${path.replace('{tenant}', c.tenant)}`, {
+      headers: { Authorization: `Bearer ${refreshed.access_token}`, 'ST-App-Key': c.appKey, Accept: 'application/json' },
+      cache: 'no-store',
+    });
+  }
+  return response;
+}
+
+export async function serviceTitanGet<T = unknown>(path: string): Promise<T> {
+  if (!path.startsWith('/')) throw new Error('ServiceTitan API path must start with /');
+  const response = await serviceTitanFetch(path);
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 500);
     throw new Error(`ServiceTitan API failed (${response.status})${detail ? `: ${detail}` : ''}`);
@@ -90,17 +103,22 @@ export async function serviceTitanGet<T = unknown>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function serviceTitanGetAll<T = Record<string, unknown>>(path: string, pageSize = 100): Promise<T[]> {
+export async function* serviceTitanPages<T = Record<string, unknown>>(path: string, pageSize = 200): AsyncGenerator<T[], void, unknown> {
   if (!path.startsWith('/')) throw new Error('ServiceTitan API path must start with /');
-  const records: T[] = [];
   for (let page = 1; page <= 1000; page += 1) {
     const separator = path.includes('?') ? '&' : '?';
     const result = await serviceTitanGet<PaginatedResponse<T>>(`${path}${separator}page=${page}&pageSize=${pageSize}&includeTotal=true`);
     const data = Array.isArray(result?.data) ? result.data : [];
-    records.push(...data);
-    if (!result?.hasMore || data.length === 0) return records;
+    if (data.length) yield data;
+    if (!result?.hasMore || data.length === 0) return;
   }
   throw new Error('ServiceTitan pagination exceeded safety limit');
+}
+
+export async function serviceTitanGetAll<T = Record<string, unknown>>(path: string, pageSize = 200): Promise<T[]> {
+  const records: T[] = [];
+  for await (const page of serviceTitanPages<T>(path, pageSize)) records.push(...page);
+  return records;
 }
 
 export async function testServiceTitanConnection() {

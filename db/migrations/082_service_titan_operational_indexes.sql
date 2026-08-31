@@ -1,0 +1,10 @@
+create index if not exists service_titan_records_jobs_customer_idx on public.service_titan_records ((payload->>'customerId')) where resource='jobs';
+create index if not exists service_titan_records_jobs_location_idx on public.service_titan_records ((payload->>'locationId')) where resource='jobs';
+create index if not exists service_titan_records_jobs_invoice_idx on public.service_titan_records ((payload->>'invoiceId')) where resource='jobs';
+create index if not exists service_titan_records_jobs_completed_text_idx on public.service_titan_records ((payload->>'completedOn')) where resource='jobs';
+create index if not exists service_titan_records_appointments_job_idx on public.service_titan_records ((payload->>'jobId')) where resource='appointments';
+create index if not exists service_titan_records_appointments_customer_idx on public.service_titan_records ((payload->>'customerId')) where resource='appointments';
+create index if not exists service_titan_records_appointments_start_text_idx on public.service_titan_records ((payload->>'start')) where resource='appointments';
+create index if not exists service_titan_records_invoices_job_idx on public.service_titan_records ((payload#>>'{job,id}')) where resource='invoices';
+create index if not exists service_titan_records_invoices_customer_idx on public.service_titan_records ((payload#>>'{customer,id}')) where resource='invoices';
+create index if not exists service_titan_records_invoices_date_text_idx on public.service_titan_records ((payload->>'invoiceDate')) where resource='invoices';

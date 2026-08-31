@@ -24,7 +24,7 @@ export default async function TeamPage(){
 
     {showServiceTitan&&<section style={{marginTop:34}}>
       <h2>ServiceTitan Sales Attribution — Last 30 Days</h2>
-      <p>Read-only ServiceTitan data attributed by each job's <code>soldById</code>. This measures sold-job revenue and average ticket; it is not yet a complete measure of technician labor productivity.</p>
+      <p>Read-only ServiceTitan data attributed by each job&apos;s <code>soldById</code>. This measures sold-job revenue and average ticket; it is not yet a complete measure of technician labor productivity.</p>
       {stResult.error?<p role="alert">ServiceTitan technician sales data could not be loaded: {stResult.error.message}</p>:<div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Technician','Sold Jobs','Completed','Revenue','Average Ticket','Last Completed Sale'].map(x=><th key={x} style={{textAlign:'left',padding:10,borderBottom:'1px solid #ccc'}}>{x}</th>)}</tr></thead><tbody>{stTechs.map((t:any)=><tr key={t.technicianId}><td style={{padding:10,borderBottom:'1px solid #eee'}}><b>{t.name||'Unnamed technician'}</b></td><td style={{padding:10,borderBottom:'1px solid #eee'}}>{Number(t.soldJobs??0).toLocaleString()}</td><td style={{padding:10,borderBottom:'1px solid #eee'}}>{Number(t.completedSoldJobs??0).toLocaleString()}</td><td style={{padding:10,borderBottom:'1px solid #eee'}}>{money.format(Number(t.revenue??0))}</td><td style={{padding:10,borderBottom:'1px solid #eee'}}>{money.format(Number(t.averageTicket??0))}</td><td style={{padding:10,borderBottom:'1px solid #eee'}}>{t.lastSoldJobAt?new Date(t.lastSoldJobAt).toLocaleDateString('en-US',{timeZone:'America/New_York'}):'—'}</td></tr>)}</tbody></table></div>}
     </section>}
 

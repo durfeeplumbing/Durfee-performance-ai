@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { serviceTitanConnectionInfo, serviceTitanGetAll } from '@/lib/servicetitan';
+import { serviceTitanConnectionInfo, serviceTitanPages } from '@/lib/servicetitan';
 
 const STAGING_BATCH_SIZE = 200;
 
@@ -15,49 +15,57 @@ async function ownerClient() {
   return supabase;
 }
 
-async function saveResource(supabase: Awaited<ReturnType<typeof ownerClient>>, resource: string, records: unknown[], info: ReturnType<typeof serviceTitanConnectionInfo>) {
-  for (let offset = 0; offset < records.length; offset += STAGING_BATCH_SIZE) {
-    const batch = records.slice(offset, offset + STAGING_BATCH_SIZE);
-    const { error } = await supabase.rpc('upsert_service_titan_resource', {
-      p_resource: resource,
-      p_records: batch,
-      p_environment: info.environment,
-      p_tenant_id: info.tenant,
-    });
-    if (error) throw new Error(`${resource} sync failed at records ${offset + 1}-${offset + batch.length}: ${error.message}`);
+async function saveResourceBatch(supabase: Awaited<ReturnType<typeof ownerClient>>, resource: string, records: unknown[], info: ReturnType<typeof serviceTitanConnectionInfo>, offset: number) {
+  const { error } = await supabase.rpc('upsert_service_titan_resource', {
+    p_resource: resource,
+    p_records: records,
+    p_environment: info.environment,
+    p_tenant_id: info.tenant,
+  });
+  if (error) throw new Error(`${resource} sync failed at records ${offset + 1}-${offset + records.length}: ${error.message}`);
+}
+
+async function syncPagedResource(supabase: Awaited<ReturnType<typeof ownerClient>>, resource: string, path: string, info: ReturnType<typeof serviceTitanConnectionInfo>) {
+  let offset = 0;
+  for await (const page of serviceTitanPages(path, STAGING_BATCH_SIZE)) {
+    await saveResourceBatch(supabase, resource, page, info, offset);
+    offset += page.length;
   }
+  return offset;
 }
 
 export async function syncServiceTitanReferenceData() {
   const supabase = await ownerClient(); const info = serviceTitanConnectionInfo();
-  const [technicians, businessUnits] = await Promise.all([
-    serviceTitanGetAll('/settings/v2/tenant/{tenant}/technicians?active=Any'),
-    serviceTitanGetAll('/settings/v2/tenant/{tenant}/business-units?active=Any'),
-  ]);
-  await saveResource(supabase, 'technicians', technicians, info); await saveResource(supabase, 'business_units', businessUnits, info);
+  await syncPagedResource(supabase, 'technicians', '/settings/v2/tenant/{tenant}/technicians?active=Any', info);
+  await syncPagedResource(supabase, 'business_units', '/settings/v2/tenant/{tenant}/business-units?active=Any', info);
   revalidatePath('/settings/integrations/servicetitan');
 }
 
 export async function syncServiceTitanCrmData() {
   const supabase = await ownerClient(); const info = serviceTitanConnectionInfo();
-  const customers = await serviceTitanGetAll('/crm/v2/tenant/{tenant}/customers'); await saveResource(supabase, 'customers', customers, info);
-  const locations = await serviceTitanGetAll('/crm/v2/tenant/{tenant}/locations'); await saveResource(supabase, 'locations', locations, info);
+  await syncPagedResource(supabase, 'customers', '/crm/v2/tenant/{tenant}/customers', info);
+  await syncPagedResource(supabase, 'locations', '/crm/v2/tenant/{tenant}/locations', info);
   revalidatePath('/settings/integrations/servicetitan');
+  revalidatePath('/customers');
 }
 
 export async function syncServiceTitanJobsData() {
   const supabase = await ownerClient(); const info = serviceTitanConnectionInfo();
-  const jobs = await serviceTitanGetAll('/jpm/v2/tenant/{tenant}/jobs'); await saveResource(supabase, 'jobs', jobs, info);
-  const appointments = await serviceTitanGetAll('/jpm/v2/tenant/{tenant}/appointments'); await saveResource(supabase, 'appointments', appointments, info);
+  await syncPagedResource(supabase, 'jobs', '/jpm/v2/tenant/{tenant}/jobs', info);
+  await syncPagedResource(supabase, 'appointments', '/jpm/v2/tenant/{tenant}/appointments', info);
   revalidatePath('/settings/integrations/servicetitan');
+  revalidatePath('/dashboard');
+  revalidatePath('/team');
 }
 
 export async function syncServiceTitanFinancialData() {
   const supabase = await ownerClient(); const info = serviceTitanConnectionInfo();
-  const invoices = await serviceTitanGetAll('/accounting/v2/tenant/{tenant}/invoices'); await saveResource(supabase, 'invoices', invoices, info);
-  const payments = await serviceTitanGetAll('/accounting/v2/tenant/{tenant}/payments'); await saveResource(supabase, 'payments', payments, info);
-  const memberships = await serviceTitanGetAll('/memberships/v2/tenant/{tenant}/memberships'); await saveResource(supabase, 'memberships', memberships, info);
+  await syncPagedResource(supabase, 'invoices', '/accounting/v2/tenant/{tenant}/invoices', info);
+  await syncPagedResource(supabase, 'payments', '/accounting/v2/tenant/{tenant}/payments', info);
+  await syncPagedResource(supabase, 'memberships', '/memberships/v2/tenant/{tenant}/memberships', info);
   revalidatePath('/settings/integrations/servicetitan');
+  revalidatePath('/dashboard');
+  revalidatePath('/accounting/receivables');
 }
 
 export async function refreshServiceTitanCustomerMappings() {

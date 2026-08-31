@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireCurrentUser } from '@/lib/session';
 import { hasPermission } from '@/lib/permissions';
@@ -14,7 +15,7 @@ export default async function ZeroInvoiceApprovalPage(){
   const {data,error}=await supabase.rpc('zero_invoice_closeout_queue');
   const rows:any[]=Array.isArray(data)?data:[];
   return <main style={{fontFamily:'system-ui',maxWidth:1000,margin:'auto',padding:32}}>
-    <p><a href="/field">← Field</a></p>
+    <p><Link href="/field">← Field</Link></p>
     <h1>Zero-Invoice Closeout Approvals</h1>
     <p>Technicians cannot close a job with a $0 invoice until a manager authorizes it here.</p>
     {error&&<p role="alert">Approval queue could not be loaded: {error.message}</p>}

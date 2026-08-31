@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireCurrentUser } from '@/lib/session';
 import { serviceTitanConfigured } from '@/lib/servicetitan';
-import { syncServiceTitanCrmData, syncServiceTitanFinancialData, syncServiceTitanJobsData, syncServiceTitanReferenceData } from './actions';
+import { refreshServiceTitanCustomerMappings, syncServiceTitanCrmData, syncServiceTitanFinancialData, syncServiceTitanJobsData, syncServiceTitanReferenceData } from './actions';
 
 function when(value?: string | null) { return value ? new Date(value).toLocaleString('en-US', { timeZone: 'America/New_York' }) : 'Never'; }
 
@@ -10,13 +10,15 @@ export default async function ServiceTitanIntegrationPage() {
   const me = await requireCurrentUser(); if (me.role !== 'owner') redirect('/dashboard');
   const supabase = await createSupabaseServerClient();
   const resources = ['technicians','business_units','customers','locations','jobs','appointments','invoices','payments','memberships'] as const;
-  const [stateResult, runsResult, ...counts] = await Promise.all([
+  const [stateResult, runsResult, mappingsResult, ...counts] = await Promise.all([
     supabase.from('service_titan_integration_state').select('*').maybeSingle(),
     supabase.from('service_titan_sync_runs').select('id,resource,status,records_seen,records_upserted,error,started_at,completed_at').order('started_at', { ascending: false }).limit(25),
+    supabase.from('service_titan_record_mappings').select('match_status').eq('resource','customers'),
     ...resources.map(resource => supabase.from('service_titan_records').select('id', { count: 'exact', head: true }).eq('resource', resource)),
   ]);
   const state = stateResult.data as any; const runs = (runsResult.data ?? []) as any[];
   const countByResource = Object.fromEntries(resources.map((resource, index) => [resource, counts[index]?.count ?? 0]));
+  const mappingCounts = (mappingsResult.data ?? []).reduce((acc: Record<string,number>, row: any) => { acc[row.match_status] = (acc[row.match_status] ?? 0) + 1; return acc; }, {});
   const configured = serviceTitanConfigured();
   return <main>
     <h1>ServiceTitan Integration</h1>
@@ -33,6 +35,15 @@ export default async function ServiceTitanIntegrationPage() {
       <form action={syncServiceTitanJobsData}><button type="submit">Sync jobs + appointments</button></form>
       <form action={syncServiceTitanFinancialData}><button type="submit">Sync invoices + payments + memberships</button></form>
       <a href="/api/servicetitan/test" target="_blank" rel="noreferrer">Test connection</a>
+    </div>
+    <h2>Customer mapping review</h2>
+    <p>Generate conservative match candidates against existing Durfee AI customers using normalized email and phone. Nothing is merged or created by this action.</p>
+    <div style={{display:'flex',gap:12,flexWrap:'wrap',margin:'12px 0 24px'}}>
+      <div className="card"><strong>Unmatched</strong><div>{mappingCounts.unmatched ?? 0}</div></div>
+      <div className="card"><strong>Candidates</strong><div>{mappingCounts.candidate ?? 0}</div></div>
+      <div className="card"><strong>Conflicts</strong><div>{mappingCounts.conflict ?? 0}</div></div>
+      <div className="card"><strong>Matched</strong><div>{mappingCounts.matched ?? 0}</div></div>
+      <form action={refreshServiceTitanCustomerMappings}><button type="submit">Refresh customer match candidates</button></form>
     </div>
     <p><small>All ServiceTitan imports on this page are staged read-only for comparison before records are mapped into Durfee AI operational tables.</small></p>
     <h2>Recent syncs</h2>

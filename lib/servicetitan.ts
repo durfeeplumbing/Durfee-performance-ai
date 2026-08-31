@@ -7,6 +7,14 @@ type TokenResponse = {
   scope?: string;
 };
 
+type PaginatedResponse<T> = {
+  page?: number;
+  pageSize?: number;
+  hasMore?: boolean;
+  totalCount?: number;
+  data?: T[];
+};
+
 function config() {
   const appKey = process.env.SERVICETITAN_APP_KEY?.trim();
   const clientId = process.env.SERVICETITAN_CLIENT_ID?.trim();
@@ -27,6 +35,11 @@ function urls(env: ServiceTitanEnv) {
 
 export function serviceTitanConfigured() {
   return Boolean(process.env.SERVICETITAN_APP_KEY && process.env.SERVICETITAN_CLIENT_ID && process.env.SERVICETITAN_CLIENT_SECRET && process.env.SERVICETITAN_TENANT_ID);
+}
+
+export function serviceTitanConnectionInfo() {
+  const c = config();
+  return { environment: c.env, tenant: c.tenant };
 }
 
 export async function getServiceTitanAccessToken() {
@@ -54,6 +67,19 @@ export async function serviceTitanGet<T = unknown>(path: string): Promise<T> {
     throw new Error(`ServiceTitan API failed (${response.status})${detail ? `: ${detail}` : ''}`);
   }
   return (await response.json()) as T;
+}
+
+export async function serviceTitanGetAll<T = Record<string, unknown>>(path: string, pageSize = 100): Promise<T[]> {
+  if (!path.startsWith('/')) throw new Error('ServiceTitan API path must start with /');
+  const records: T[] = [];
+  for (let page = 1; page <= 1000; page += 1) {
+    const separator = path.includes('?') ? '&' : '?';
+    const result = await serviceTitanGet<PaginatedResponse<T>>(`${path}${separator}page=${page}&pageSize=${pageSize}&includeTotal=true`);
+    const data = Array.isArray(result?.data) ? result.data : [];
+    records.push(...data);
+    if (!result?.hasMore || data.length === 0) return records;
+  }
+  throw new Error('ServiceTitan pagination exceeded safety limit');
 }
 
 export async function testServiceTitanConnection() {

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireCurrentUser } from '@/lib/session';
 import { serviceTitanConfigured } from '@/lib/servicetitan';
+import ServiceTitanSyncButton from './sync-button';
 import { refreshServiceTitanCustomerMappings, syncServiceTitanCrmData, syncServiceTitanFinancialData, syncServiceTitanJobsData, syncServiceTitanReferenceData } from './actions';
 
 function when(value?: string | null) { return value ? new Date(value).toLocaleString('en-US', { timeZone: 'America/New_York' }) : 'Never'; }
@@ -30,12 +31,13 @@ export default async function ServiceTitanIntegrationPage() {
       <div className="card"><strong>Last successful sync</strong><div>{when(state?.last_successful_sync)}</div></div>
     </section>
     <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:24}}>
-      <form action={syncServiceTitanReferenceData}><button type="submit">Sync technicians + business units</button></form>
-      <form action={syncServiceTitanCrmData}><button type="submit">Sync customers + locations</button></form>
-      <form action={syncServiceTitanJobsData}><button type="submit">Sync jobs + appointments</button></form>
-      <form action={syncServiceTitanFinancialData}><button type="submit">Sync invoices + payments + memberships</button></form>
+      <form action={syncServiceTitanReferenceData}><ServiceTitanSyncButton idleLabel="Sync technicians + business units" /></form>
+      <form action={syncServiceTitanCrmData}><ServiceTitanSyncButton idleLabel="Sync customers + locations" /></form>
+      <form action={syncServiceTitanJobsData}><ServiceTitanSyncButton idleLabel="Sync jobs + appointments" pendingLabel="Syncing jobs + appointments…" /></form>
+      <form action={syncServiceTitanFinancialData}><ServiceTitanSyncButton idleLabel="Sync invoices + payments + memberships" pendingLabel="Syncing financial data…" /></form>
       <a href="/api/servicetitan/test" target="_blank" rel="noreferrer">Test connection</a>
     </div>
+    <p><small>When a sync is running, its button is disabled and displays Syncing. When it finishes, the refreshed cached counts and Recent syncs table below confirm the saved records.</small></p>
     <h2>Customer mapping review</h2>
     <p>Generate conservative match candidates against existing Durfee AI customers using normalized email and phone. Nothing is merged or created by this action.</p>
     <div style={{display:'flex',gap:12,flexWrap:'wrap',margin:'12px 0 24px'}}>
@@ -43,7 +45,7 @@ export default async function ServiceTitanIntegrationPage() {
       <div className="card"><strong>Candidates</strong><div>{mappingCounts.candidate ?? 0}</div></div>
       <div className="card"><strong>Conflicts</strong><div>{mappingCounts.conflict ?? 0}</div></div>
       <div className="card"><strong>Matched</strong><div>{mappingCounts.matched ?? 0}</div></div>
-      <form action={refreshServiceTitanCustomerMappings}><button type="submit">Refresh customer match candidates</button></form>
+      <form action={refreshServiceTitanCustomerMappings}><ServiceTitanSyncButton idleLabel="Refresh customer match candidates" pendingLabel="Refreshing matches…" /></form>
     </div>
     <p><small>All ServiceTitan imports on this page are staged read-only for comparison before records are mapped into Durfee AI operational tables.</small></p>
     <h2>Recent syncs</h2>

@@ -15,25 +15,21 @@ begin
   loop
     original:=pg_get_functiondef(r.oid); d:=original;
 
-    -- Permission wrappers are the authorization boundary. Keep identity checks and business-rule checks in implementations.
-    d:=regexp_replace(d,E"if\\s+v_role\\s+not\\s+in\\s*\\([^)]*\\)\\s+then\\s+raise\\s+exception\\s+'[^']*';\\s*end\\s+if;",'', 'i');
-    d:=regexp_replace(d,E"if\\s+v_actor\\s+is\\s+null\\s+or\\s+v_role\\s+not\\s+in\\s*\\([^)]*\\)\\s+then\\s+raise\\s+exception\\s+'Not authorized';\\s*end\\s+if;",E"if v_actor is null then raise exception 'Employee identity unavailable'; end if;", 'i');
-    d:=regexp_replace(d,E"if\\s+v_user\\.id\\s+is\\s+null\\s+or\\s+v_user\\.role\\s+not\\s+in\\s*\\([^)]*\\)\\s+then\\s+raise\\s+exception\\s+'Not authorized';\\s*end\\s+if;",E"if v_user.id is null then raise exception 'Employee identity unavailable'; end if;", 'i');
-    d:=regexp_replace(d,E"if\\s+u\\.id\\s+is\\s+null\\s+or\\s+u\\.role\\s+not\\s+in\\s*\\([^)]*\\)\\s+then\\s+raise\\s+exception\\s+'Not authorized';\\s*end\\s+if;",E"if u.id is null then raise exception 'Employee identity unavailable'; end if;", 'i');
-    d:=regexp_replace(d,E"if\\s+actor\\.id\\s+is\\s+null\\s+or\\s+actor\\.role\\s+not\\s+in\\s*\\([^)]*\\)\\s+then\\s+raise\\s+exception\\s+'Not authorized';\\s*end\\s+if;",E"if actor.id is null then raise exception 'Employee identity unavailable'; end if;", 'i');
+    d:=regexp_replace(d,$re$if\s+v_role\s+not\s+in\s*\([^)]*\)\s+then\s+raise\s+exception\s+'[^']*';\s*end\s+if;$re$,'','i');
+    d:=regexp_replace(d,$re$if\s+v_actor\s+is\s+null\s+or\s+v_role\s+not\s+in\s*\([^)]*\)\s+then\s+raise\s+exception\s+'Not authorized';\s*end\s+if;$re$,$rep$if v_actor is null then raise exception 'Employee identity unavailable'; end if;$rep$,'i');
+    d:=regexp_replace(d,$re$if\s+v_user\.id\s+is\s+null\s+or\s+v_user\.role\s+not\s+in\s*\([^)]*\)\s+then\s+raise\s+exception\s+'Not authorized';\s*end\s+if;$re$,$rep$if v_user.id is null then raise exception 'Employee identity unavailable'; end if;$rep$,'i');
+    d:=regexp_replace(d,$re$if\s+u\.id\s+is\s+null\s+or\s+u\.role\s+not\s+in\s*\([^)]*\)\s+then\s+raise\s+exception\s+'Not authorized';\s*end\s+if;$re$,$rep$if u.id is null then raise exception 'Employee identity unavailable'; end if;$rep$,'i');
+    d:=regexp_replace(d,$re$if\s+actor\.id\s+is\s+null\s+or\s+actor\.role\s+not\s+in\s*\([^)]*\)\s+then\s+raise\s+exception\s+'Not authorized';\s*end\s+if;$re$,$rep$if actor.id is null then raise exception 'Employee identity unavailable'; end if;$rep$,'i');
 
-    -- Users with field_app may act only on their assigned job unless they also have management authority.
-    d:=regexp_replace(d,E"if\\s+v_role='technician'\\s+and\\s+v_job\\.technician_id\\s+is\\s+distinct\\s+from\\s+v_actor\\s+then\\s+raise\\s+exception\\s+'[^']*';\\s*end\\s+if;",E"if v_job.technician_id is distinct from v_actor and not (private.has_permission('manage_jobs') or private.has_permission('manage_dispatch')) then raise exception 'Field users can only update their assigned jobs'; end if;", 'i');
-    d:=regexp_replace(d,E"if\\s+v_user\\.role='technician'\\s+and\\s+v_job\\.technician_id\\s+is\\s+distinct\\s+from\\s+v_user\\.id\\s+then\\s+raise\\s+exception\\s+'[^']*';\\s*end\\s+if;",E"if v_job.technician_id is distinct from v_user.id and not (private.has_permission('manage_jobs') or private.has_permission('manage_dispatch')) then raise exception 'Field users can only update their assigned jobs'; end if;", 'i');
+    -- field_app is permission-authoritative, but non-management field users remain assignment-scoped.
+    d:=regexp_replace(d,$re$if\s+v_role='technician'\s+and\s+v_job\.technician_id\s+is\s+distinct\s+from\s+v_actor\s+then\s+raise\s+exception\s+'[^']*';\s*end\s+if;$re$,$rep$if v_job.technician_id is distinct from v_actor and not (private.has_permission('manage_jobs') or private.has_permission('manage_dispatch')) then raise exception 'Field users can only update their assigned jobs'; end if;$rep$,'i');
+    d:=regexp_replace(d,$re$if\s+v_user\.role='technician'\s+and\s+v_job\.technician_id\s+is\s+distinct\s+from\s+v_user\.id\s+then\s+raise\s+exception\s+'[^']*';\s*end\s+if;$re$,$rep$if v_job.technician_id is distinct from v_user.id and not (private.has_permission('manage_jobs') or private.has_permission('manage_dispatch')) then raise exception 'Field users can only update their assigned jobs'; end if;$rep$,'i');
 
-    if d=original then
-      raise exception 'Expected authorization guard not found in %',r.proname;
-    end if;
+    if d=original then raise exception 'Expected authorization guard not found in %',r.proname; end if;
     execute d;
   end loop;
 end $$;
 
--- Staging wrapper also had a historical fixed-role gate. Permission is now authoritative.
 create or replace function public.create_job_material_stage(p_purchase_order_id uuid,p_job_id uuid,p_inventory_item_id uuid,p_quantity numeric,p_staging_location text)
 returns uuid language plpgsql security definer set search_path=public,private,pg_temp as $$
 declare a public.users%rowtype; rid uuid;
@@ -50,7 +46,6 @@ end$$;
 revoke all on function public.create_job_material_stage(uuid,uuid,uuid,numeric,text) from public,anon;
 grant execute on function public.create_job_material_stage(uuid,uuid,uuid,numeric,text) to authenticated;
 
--- Implementation functions are never API entrypoints.
 do $$
 declare r record;
 begin

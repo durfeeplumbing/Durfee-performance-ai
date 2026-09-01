@@ -104,7 +104,7 @@ export default async function TeamPage(){
         <p>30-day operating scorecards. GP target: <b>{floor.toFixed(1)}%</b>. Callback quality uses manager-reviewed incidents only.</p>
         {!mgmt&&<p><small>Your scorecard shows your operating and sales metrics. Internal company cost and callback-cost detail stays management-only.</small></p>}
       </div>
-      {mgmt&&<div><Link href="/reports/profitability">GP Control Center</Link> · <Link href="/jobs/callbacks">Callbacks</Link></div>}
+      {mgmt&&<div><Link href="/reports/profitability">GP Control Center</Link> · <Link href="/jobs/callbacks">Callbacks</Link> · <Link href="/dispatch/fleet-optimizer">Fleet Day Plan</Link></div>}
     </div>
 
     {error&&<p role="alert">Technicians could not be loaded.</p>}
@@ -171,15 +171,17 @@ export default async function TeamPage(){
     </details>}
 
     {mgmt&&<section style={{marginTop:34}}>
-      <h2>ServiceTitan Field Productivity</h2>
-      {prod.error?<p role="alert">Productivity unavailable.</p>:Number(p.timesheetRecords??0)===0?<p>No job-timesheet records synced yet.</p>:<div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Technician','Completed','On-site Hrs','Dispatch → Arrival','Attributed Revenue','Revenue / On-site Hr'].map(x=><th key={x} style={{textAlign:'left',padding:9,borderBottom:'1px solid #ccc'}}>{x}</th>)}</tr></thead><tbody>{pTechs.map((x:any)=><tr key={x.technicianId}><td style={{padding:9}}><b>{x.name}</b></td><td>{x.jobsCompleted}</td><td>{Number(x.onsiteHours??0).toFixed(1)}</td><td>{Number(x.dispatchToArrivalHours??0).toFixed(1)} hr</td><td>{money.format(Number(x.attributedRevenue??0))}</td><td>{money.format(Number(x.revenuePerOnsiteHour??0))}</td></tr>)}</tbody></table></div>}
+      <h2>ServiceTitan Field &amp; Travel Productivity</h2>
+      <p><small>Dispatch-to-arrival time is used as a travel proxy because it is the field timestamp currently synced from ServiceTitan. It is operating context, not a technician grade.</small></p>
+      {prod.error?<p role="alert">Productivity unavailable.</p>:Number(p.timesheetRecords??0)===0?<p>No job-timesheet records synced yet.</p>:<div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Technician','Completed','On-site Hrs','Travel Proxy Hrs','Travel Share','On-site Share','Attributed Revenue','Revenue / On-site Hr','Revenue / Field Hr'].map(x=><th key={x} style={{textAlign:'left',padding:9,borderBottom:'1px solid #ccc'}}>{x}</th>)}</tr></thead><tbody>{pTechs.map((x:any)=>{const onsite=Number(x.onsiteHours??0),travel=Number(x.dispatchToArrivalHours??0),field=onsite+travel,travelShare=field?travel/field*100:0,onsiteShare=field?onsite/field*100:0,revenue=Number(x.attributedRevenue??0);return <tr key={x.technicianId}><td style={{padding:9}}><b>{x.name}</b></td><td>{x.jobsCompleted}</td><td>{onsite.toFixed(1)}</td><td>{travel.toFixed(1)}</td><td>{field?`${travelShare.toFixed(0)}%`:'—'}</td><td>{field?`${onsiteShare.toFixed(0)}%`:'—'}</td><td>{money.format(revenue)}</td><td>{money.format(Number(x.revenuePerOnsiteHour??0))}</td><td>{field?money.format(revenue/field):'—'}</td></tr>})}</tbody></table></div>}
+      <p><small>Use high travel share as a dispatch/routing signal first. Geography, job type, parts runs, customer timing, and assigned territory can all drive windshield time. Review <Link href="/dispatch/fleet-optimizer">Fleet Day Plan</Link> before attributing travel inefficiency to a technician.</small></p>
     </section>}
 
     {mgmt&&stTechs.length>0&&<details style={{marginTop:24}}><summary>Legacy ServiceTitan sold-by job snapshot</summary><p>{stTechs.length} technician records available. The estimate funnel above is the authoritative estimate-status view.</p></details>}
 
     <aside style={{marginTop:28,border:'2px solid #222',borderRadius:16,padding:18}}>
       <h2>Performance guardrail</h2>
-      <p>These are operating measurements, not automatic employee grades. Callback attribution requires manager review; ServiceTitan recalls are informational. Service mix, access conditions, sold scope, pricing and estimating can change the numbers. Compensation, discipline and employment decisions remain human management decisions.</p>
+      <p>These are operating measurements, not automatic employee grades. Callback attribution requires manager review; ServiceTitan recalls are informational. Travel measurements are primarily dispatch and routing context. Service mix, geography, access conditions, sold scope, pricing and estimating can change the numbers. Compensation, discipline and employment decisions remain human management decisions.</p>
     </aside>
   </main>;
 }

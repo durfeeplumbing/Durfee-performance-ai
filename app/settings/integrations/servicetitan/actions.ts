@@ -22,7 +22,10 @@ async function saveResourceBatch(supabase: Awaited<ReturnType<typeof ownerClient
 
 async function syncPagedResource(supabase: Awaited<ReturnType<typeof ownerClient>>, resource: string, path: string, info: ReturnType<typeof serviceTitanConnectionInfo>) {
   let offset = 0;
-  for await (const page of serviceTitanPages(path, STAGING_BATCH_SIZE)) { await saveResourceBatch(supabase, resource, page, info, offset); offset += page.length; }
+  for await (const page of serviceTitanPages(path, STAGING_BATCH_SIZE)) {
+    await saveResourceBatch(supabase, resource, page, info, offset);
+    offset += page.length;
+  }
   return offset;
 }
 
@@ -45,6 +48,12 @@ export async function syncServiceTitanJobsData() {
   await syncPagedResource(supabase, 'jobs', '/jpm/v2/tenant/{tenant}/jobs', info);
   await syncPagedResource(supabase, 'appointments', '/jpm/v2/tenant/{tenant}/appointments', info);
   revalidatePath('/settings/integrations/servicetitan'); revalidatePath('/dashboard'); revalidatePath('/team');
+}
+
+export async function syncServiceTitanEstimateData() {
+  const supabase = await ownerClient(); const info = serviceTitanConnectionInfo();
+  await syncPagedResource(supabase, 'estimates', '/sales/v2/tenant/{tenant}/estimates?active=Any', info);
+  revalidatePath('/settings/integrations/servicetitan'); revalidatePath('/team');
 }
 
 export async function syncServiceTitanTechnicianPerformanceData() {

@@ -3,17 +3,18 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireCurrentUser } from '@/lib/session';
 import { serviceTitanConfigured } from '@/lib/servicetitan';
 import ServiceTitanSyncForm from './sync-form';
-import { refreshServiceTitanCustomerMappings, syncServiceTitanCrmData, syncServiceTitanEstimateData, syncServiceTitanFinancialData, syncServiceTitanJobsData, syncServiceTitanReferenceData } from './actions';
+import { refreshServiceTitanCustomerMappings, syncServiceTitanAllData, syncServiceTitanCrmData, syncServiceTitanDailyData, syncServiceTitanEstimateData, syncServiceTitanFinancialData, syncServiceTitanJobsData, syncServiceTitanReferenceData, syncServiceTitanTechnicianPerformanceData } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+export const maxDuration = 300;
 
 function when(value?: string | null) { return value ? new Date(value).toLocaleString('en-US', { timeZone: 'America/New_York' }) : 'Never'; }
 
 export default async function ServiceTitanIntegrationPage() {
   const me = await requireCurrentUser(); if (me.role !== 'owner') redirect('/dashboard');
   const supabase = await createSupabaseServerClient();
-  const resources = ['technicians','business_units','customers','locations','jobs','appointments','estimates','invoices','payments','memberships'] as const;
+  const resources = ['technicians','business_units','customers','locations','jobs','appointments','estimates','job_timesheets','job_splits','invoices','payments','memberships'] as const;
   const [stateResult, runsResult, mappingsResult, statusResult] = await Promise.all([
     supabase.from('service_titan_integration_state').select('*').maybeSingle(),
     supabase.from('service_titan_sync_runs').select('id,resource,status,records_seen,records_upserted,error,started_at,completed_at').order('started_at', { ascending: false }).limit(25),
@@ -56,22 +57,37 @@ export default async function ServiceTitanIntegrationPage() {
       </div>
     </section>
 
+    <section className="card" style={{padding:20,margin:'20px 0',border:'2px solid #222'}}>
+      <h2 style={{marginTop:0}}>One-click synchronization</h2>
+      <p>Use Daily Sync for normal operations. Full Sync also refreshes technicians, business units, customers, locations, and customer-match candidates.</p>
+      <div style={{display:'flex',gap:12,flexWrap:'wrap',alignItems:'flex-start'}}>
+        <ServiceTitanSyncForm action={syncServiceTitanDailyData} idleLabel="Run Daily ServiceTitan Sync" pendingLabel="Syncing daily operations…" successTitle="Daily ServiceTitan sync complete" successMessage="Jobs, appointments, estimates, technician activity, invoices, payments and memberships are up to date." />
+        <ServiceTitanSyncForm action={syncServiceTitanAllData} idleLabel="Run Full ServiceTitan Sync" pendingLabel="Syncing all ServiceTitan data…" successTitle="Full ServiceTitan sync complete" successMessage="Reference, CRM, operating, estimate, technician, financial and customer-mapping feeds are up to date." />
+      </div>
+    </section>
+
     <section style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,margin:'20px 0'}}>
       <div className="card"><strong>Credentials</strong><div>{configured ? 'Configured' : 'Missing'}</div></div>
       <div className="card"><strong>Environment</strong><div>{state?.environment ?? 'production'}</div></div>
       {resources.map(resource => <div className="card" key={resource}><strong>{resource.replaceAll('_',' ')} cached</strong><div>{Number(countByResource[resource]).toLocaleString()}</div></div>)}
       <div className="card"><strong>Last successful sync</strong><div>{when(state?.last_successful_sync)}</div></div>
     </section>
-    <div style={{display:'flex',gap:12,flexWrap:'wrap',marginBottom:24,alignItems:'flex-start'}}>
-      <ServiceTitanSyncForm action={syncServiceTitanReferenceData} idleLabel="Sync technicians + business units" pendingLabel="Syncing technicians + business units…" successTitle="Reference sync complete" successMessage="Technicians and business units are up to date." />
-      <ServiceTitanSyncForm action={syncServiceTitanCrmData} idleLabel="Sync customers + locations" pendingLabel="Syncing customers + locations…" successTitle="Customer sync complete" successMessage="Customers and locations are up to date." />
-      <ServiceTitanSyncForm action={syncServiceTitanJobsData} idleLabel="Sync jobs + appointments" pendingLabel="Syncing jobs + appointments…" successTitle="Jobs sync complete" successMessage="Jobs and appointments are up to date." />
-      <ServiceTitanSyncForm action={syncServiceTitanEstimateData} idleLabel="Sync estimates" pendingLabel="Syncing estimates…" successTitle="Estimate sync complete" successMessage="Estimate status, sold date and sold-by attribution are up to date." />
-      <ServiceTitanSyncForm action={syncServiceTitanFinancialData} idleLabel="Sync invoices + payments + memberships" pendingLabel="Syncing financial data…" successTitle="Financial sync complete" successMessage="Invoices, payments, and memberships are up to date." />
-      <a href="/api/servicetitan/test" target="_blank" rel="noreferrer">Test connection</a>
-    </div>
+
+    <details style={{marginBottom:24}}>
+      <summary style={{cursor:'pointer',fontWeight:700}}>Individual sync controls</summary>
+      <div style={{display:'flex',gap:12,flexWrap:'wrap',marginTop:14,alignItems:'flex-start'}}>
+        <ServiceTitanSyncForm action={syncServiceTitanReferenceData} idleLabel="Sync technicians + business units" pendingLabel="Syncing technicians + business units…" successTitle="Reference sync complete" successMessage="Technicians and business units are up to date." />
+        <ServiceTitanSyncForm action={syncServiceTitanCrmData} idleLabel="Sync customers + locations" pendingLabel="Syncing customers + locations…" successTitle="Customer sync complete" successMessage="Customers and locations are up to date." />
+        <ServiceTitanSyncForm action={syncServiceTitanJobsData} idleLabel="Sync jobs + appointments" pendingLabel="Syncing jobs + appointments…" successTitle="Jobs sync complete" successMessage="Jobs and appointments are up to date." />
+        <ServiceTitanSyncForm action={syncServiceTitanEstimateData} idleLabel="Sync estimates" pendingLabel="Syncing estimates…" successTitle="Estimate sync complete" successMessage="Estimate status, sold date and sold-by attribution are up to date." />
+        <ServiceTitanSyncForm action={syncServiceTitanTechnicianPerformanceData} idleLabel="Sync technician activity" pendingLabel="Syncing technician activity…" successTitle="Technician activity sync complete" successMessage="Timesheets and job splits are up to date." />
+        <ServiceTitanSyncForm action={syncServiceTitanFinancialData} idleLabel="Sync invoices + payments + memberships" pendingLabel="Syncing financial data…" successTitle="Financial sync complete" successMessage="Invoices, payments, and memberships are up to date." />
+        <a href="/api/servicetitan/test" target="_blank" rel="noreferrer">Test connection</a>
+      </div>
+    </details>
+
     <p><small>The estimate feed requires the ServiceTitan app scope <b>Sales &amp; Estimates → Estimates (Read)</b>. Estimate sync is read-only and is used for close-rate and sold-estimate reporting.</small></p>
-    <p><small>Each sync refreshes this page automatically when it finishes and displays a confirmation screen. Cached totals, system health, and Recent syncs update without a manual reload.</small></p>
+    <p><small>Each sync refreshes this page automatically when it finishes. The full sync is intentionally owner-controlled because it can process tens of thousands of staged records.</small></p>
     <h2>Customer mapping review</h2>
     <p>Generate conservative match candidates against existing Durfee AI customers using normalized email and phone. Nothing is merged or created by this action.</p>
     <div style={{display:'flex',gap:12,flexWrap:'wrap',margin:'12px 0 24px',alignItems:'flex-start'}}>

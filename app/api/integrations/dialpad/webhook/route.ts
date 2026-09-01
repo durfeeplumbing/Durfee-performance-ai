@@ -118,13 +118,27 @@ export async function POST(request:Request){
     transcript:null,ai_summary:null,disposition:firstText(payload.disposition,payload.result),updated_at:new Date().toISOString(),
   };
 
-  const operation=existing?.id
-    ?await admin.from('customer_communications').update(values).eq('id',existing.id)
-    :await admin.from('customer_communications').insert(values);
-  if(operation.error){
-    await finish(operation.error.message);
-    console.error('Dialpad communication write failed',operation.error.message);
-    return NextResponse.json({ok:false},{status:500});
+  let communicationId:string|null=existing?.id??null;
+  if(existing?.id){
+    const operation=await admin.from('customer_communications').update(values).eq('id',existing.id);
+    if(operation.error){
+      await finish(operation.error.message);
+      console.error('Dialpad communication write failed',operation.error.message);
+      return NextResponse.json({ok:false},{status:500});
+    }
+  }else{
+    const operation=await admin.from('customer_communications').insert(values).select('id').single();
+    if(operation.error){
+      await finish(operation.error.message);
+      console.error('Dialpad communication write failed',operation.error.message);
+      return NextResponse.json({ok:false},{status:500});
+    }
+    communicationId=operation.data?.id??null;
+  }
+
+  if(communicationId&&channel==='phone'&&direction==='inbound'){
+    const linked=await admin.rpc('link_marketing_call',{p_communication_id:communicationId});
+    if(linked.error)console.error('Marketing call attribution failed',linked.error.message);
   }
 
   await finish(null);

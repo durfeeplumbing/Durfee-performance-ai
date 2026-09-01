@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireCurrentUser } from '@/lib/session';
+import { dialpadConnected } from '@/lib/integrations/dialpad';
 import { queueCommunication,recordCommunication } from './actions';
 
 export const dynamic='force-dynamic';
@@ -19,6 +20,10 @@ export default async function CommunicationsPage(){
   ]);
   const rows:any[]=Array.isArray(inbox.data)?inbox.data:[];
   const canManage=['owner','manager'].includes(user.role)||manage.data===true;
+  const dialpadApiReady=dialpadConnected();
+  const dialpadWebhookReady=Boolean(process.env.DIALPAD_WEBHOOK_SECRET?.trim());
+  const supabaseWebhookReady=Boolean((process.env.SUPABASE_SECRET_KEY||process.env.SUPABASE_SERVICE_ROLE_KEY)?.trim());
+  const dialpadReady=dialpadApiReady&&dialpadWebhookReady&&supabaseWebhookReady;
   const inbound=rows.filter(r=>r.direction==='inbound').length;
   const missed=rows.filter(r=>r.status==='missed').length;
   const followup=rows.filter(r=>r.bookingOutcome==='follow_up'||r.status==='queued').length;
@@ -30,6 +35,13 @@ export default async function CommunicationsPage(){
       <div><Link href="/csr">CSR</Link> · <Link href="/reviews">Reviews</Link> · <Link href="/customers">Customers</Link></div>
     </div>
 
+    <section style={{border:`2px solid ${dialpadReady?'#4d7':'#ca8'}`,borderRadius:16,padding:16,margin:'18px 0'}}>
+      <h2 style={{marginTop:0}}>Dialpad {dialpadReady?'Ready':'Connection Setup'}</h2>
+      <p>{dialpadReady?'Phone calls and SMS can be started directly from Durfee Performance AI. Signed Dialpad call/text events will return to this timeline automatically.':'The Durfee side is built. Add the Dialpad API key, webhook signing secret, and Supabase server secret to the deployment environment to turn on live calls/texts.'}</p>
+      <p><small>Webhook: <code>https://durfee-performance-ai.vercel.app/api/integrations/dialpad/webhook</code></small></p>
+      {user.role==='owner'&&<p><small>Server checks: API key {dialpadApiReady?'✓':'—'} · webhook secret {dialpadWebhookReady?'✓':'—'} · database server key {supabaseWebhookReady?'✓':'—'}. Dialpad SMS also requires business-messaging registration. Enable SMS-content export for message bodies and recordings export if you want recording links returned to the FSM.</small></p>}
+    </section>
+
     {inbox.error&&<p role="alert">Communications inbox unavailable: {inbox.error.message}</p>}
     <section style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:10,margin:'20px 0'}}>
       {[["30-Day Activity",rows.length],["Inbound",inbound],["Missed Calls",missed],["Needs Follow-up",followup],["Booked",booked]].map(([a,b])=><article key={String(a)} style={{border:'1px solid #ddd',borderRadius:14,padding:14}}><small>{a}</small><h2>{String(b)}</h2></article>)}
@@ -37,7 +49,7 @@ export default async function CommunicationsPage(){
 
     {canManage&&<section style={{border:'1px solid #ccc',borderRadius:18,padding:20,marginBottom:26}}>
       <h2>Compose / Start Contact</h2>
-      <p><small>Phone, SMS and email use the same queue. Provider credentials are intentionally kept out of source control; queued items become sendable when the communications provider is connected.</small></p>
+      <p><small>Phone and SMS run through Dialpad when connected. Email stays in the same queue/timeline and will become live when the email delivery provider is connected.</small></p>
       <form action={queueCommunication} style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:10}}>
         <label>Customer<br/><select name="customer_id" required defaultValue=""><option value="" disabled>Select customer</option>{(customers.data??[]).map((c:any)=><option key={c.id} value={c.id}>{c.name} — {c.phone||c.email||'no contact'}</option>)}</select></label>
         <label>Channel<br/><select name="channel" defaultValue="sms"><option value="phone">Phone</option><option value="sms">SMS</option><option value="email">Email</option></select></label>
@@ -45,7 +57,7 @@ export default async function CommunicationsPage(){
         <label>Job (optional)<br/><select name="job_id" defaultValue=""><option value="">No job</option>{(jobs.data??[]).map((j:any)=><option key={j.id} value={j.id}>{j.service_type||'Service'} — {j.status}</option>)}</select></label>
         <label>Subject (email)<br/><input name="subject" placeholder="Optional subject"/></label>
         <label style={{gridColumn:'1 / -1'}}>Message / call purpose<br/><textarea name="body" rows={3} placeholder="SMS or email body; for phone, optional call purpose" style={{width:'100%'}}/></label>
-        <div><button type="submit">Queue Communication</button></div>
+        <div><button type="submit">Send / Start Communication</button></div>
       </form>
     </section>}
 

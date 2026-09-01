@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { requireCurrentUser } from '@/lib/session';
 import { serviceTitanConfigured } from '@/lib/servicetitan';
 import ServiceTitanSyncForm from './sync-form';
-import { refreshServiceTitanCustomerMappings, syncServiceTitanCrmData, syncServiceTitanFinancialData, syncServiceTitanJobsData, syncServiceTitanReferenceData } from './actions';
+import { refreshServiceTitanCustomerMappings, syncServiceTitanCrmData, syncServiceTitanEstimateData, syncServiceTitanFinancialData, syncServiceTitanJobsData, syncServiceTitanReferenceData } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -13,7 +13,7 @@ function when(value?: string | null) { return value ? new Date(value).toLocaleSt
 export default async function ServiceTitanIntegrationPage() {
   const me = await requireCurrentUser(); if (me.role !== 'owner') redirect('/dashboard');
   const supabase = await createSupabaseServerClient();
-  const resources = ['technicians','business_units','customers','locations','jobs','appointments','invoices','payments','memberships'] as const;
+  const resources = ['technicians','business_units','customers','locations','jobs','appointments','estimates','invoices','payments','memberships'] as const;
   const [stateResult, runsResult, mappingsResult, statusResult] = await Promise.all([
     supabase.from('service_titan_integration_state').select('*').maybeSingle(),
     supabase.from('service_titan_sync_runs').select('id,resource,status,records_seen,records_upserted,error,started_at,completed_at').order('started_at', { ascending: false }).limit(25),
@@ -66,9 +66,11 @@ export default async function ServiceTitanIntegrationPage() {
       <ServiceTitanSyncForm action={syncServiceTitanReferenceData} idleLabel="Sync technicians + business units" pendingLabel="Syncing technicians + business units…" successTitle="Reference sync complete" successMessage="Technicians and business units are up to date." />
       <ServiceTitanSyncForm action={syncServiceTitanCrmData} idleLabel="Sync customers + locations" pendingLabel="Syncing customers + locations…" successTitle="Customer sync complete" successMessage="Customers and locations are up to date." />
       <ServiceTitanSyncForm action={syncServiceTitanJobsData} idleLabel="Sync jobs + appointments" pendingLabel="Syncing jobs + appointments…" successTitle="Jobs sync complete" successMessage="Jobs and appointments are up to date." />
+      <ServiceTitanSyncForm action={syncServiceTitanEstimateData} idleLabel="Sync estimates" pendingLabel="Syncing estimates…" successTitle="Estimate sync complete" successMessage="Estimate status, sold date and sold-by attribution are up to date." />
       <ServiceTitanSyncForm action={syncServiceTitanFinancialData} idleLabel="Sync invoices + payments + memberships" pendingLabel="Syncing financial data…" successTitle="Financial sync complete" successMessage="Invoices, payments, and memberships are up to date." />
       <a href="/api/servicetitan/test" target="_blank" rel="noreferrer">Test connection</a>
     </div>
+    <p><small>The estimate feed requires the ServiceTitan app scope <b>Sales &amp; Estimates → Estimates (Read)</b>. Estimate sync is read-only and is used for close-rate and sold-estimate reporting.</small></p>
     <p><small>Each sync refreshes this page automatically when it finishes and displays a confirmation screen. Cached totals, system health, and Recent syncs update without a manual reload.</small></p>
     <h2>Customer mapping review</h2>
     <p>Generate conservative match candidates against existing Durfee AI customers using normalized email and phone. Nothing is merged or created by this action.</p>

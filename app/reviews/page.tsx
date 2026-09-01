@@ -8,7 +8,7 @@ export const dynamic='force-dynamic';
 export default async function ReviewsPage(){
   const user=await requireCurrentUser();
   const s=await createSupabaseServerClient();
-  const canManage=['owner','manager','csr_dispatch'].includes(user.role)||user.role==='csr';
+  const canManage=['owner','manager','csr_dispatch'].includes(user.role);
   const {data,error}=await s.rpc('review_management_queue',{p_days:30});
   const rows:any[]=Array.isArray(data)?data:[];
   const recommended=rows.filter(r=>r.reviewRecommended);

@@ -12,16 +12,19 @@ export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient();
   const start = new Date(); start.setHours(0, 0, 0, 0);
   const managerRole=['owner','manager'].includes(user.role);
-  const serviceTitanPromise = user.role === 'owner' ? supabase.rpc('service_titan_dashboard_snapshot', { p_since: start.toISOString() }) : Promise.resolve({ data: null, error: null });
+  const ownerRole=user.role==='owner';
+  const serviceTitanPromise = ownerRole ? supabase.rpc('service_titan_dashboard_snapshot', { p_since: start.toISOString() }) : Promise.resolve({ data: null, error: null });
+  const estimateFunnelPromise = ownerRole ? supabase.rpc('service_titan_estimate_funnel', { p_days: 30 }) : Promise.resolve({ data: null, error: null });
   const gpQueuePromise=managerRole?supabase.rpc('gp_closeout_queue'):Promise.resolve({data:[],error:null});
 
-  const [{ data: jobs, error },{ data: settings },{ count: pendingLearning },{ count: dueFollowups },{ data: ap },{ data: serviceTitanData, error: serviceTitanError },gpQueueResult] = await Promise.all([
+  const [{ data: jobs, error },{ data: settings },{ count: pendingLearning },{ count: dueFollowups },{ data: ap },{ data: serviceTitanData, error: serviceTitanError },{data:estimateFunnelData,error:estimateFunnelError},gpQueueResult] = await Promise.all([
     supabase.from('jobs').select('id,status,revenue,material_cost,labor_cost,allocated_overhead,completed_at,created_at,job_cost_allocations(amount,allocation_type,reversed_at)').gte('created_at', start.toISOString()),
     supabase.from('company_pricing_settings').select('minimum_gp').limit(1).maybeSingle(),
     supabase.from('price_book_learning_proposals').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('customer_followups').select('id', { count: 'exact', head: true }).lte('follow_up_at', new Date().toISOString()),
     ['owner', 'manager', 'accounting'].includes(user.role) ? supabase.from('accounts_payable_entries').select('id,balance_due,status,due_date').in('status', ['open', 'partial']) : Promise.resolve({ data: [] }),
     serviceTitanPromise,
+    estimateFunnelPromise,
     gpQueuePromise,
   ]);
 
@@ -35,7 +38,7 @@ export default async function DashboardPage() {
     {label:'Below GP Floor',value:String(belowFloor),detail:`${money.format(gpShortfall)} target shortfall`},
     {label:'Pending GP Approvals',value:String(gpQueue.length),detail:'Manager closeout review'},
   ];
-  const st=(serviceTitanData??null) as any,stAvailable=user.role==='owner'&&!serviceTitanError&&st,stCards=stAvailable?[
+  const st=(serviceTitanData??null) as any,stAvailable=ownerRole&&!serviceTitanError&&st,stCards=stAvailable?[
     {label:'ST Completed Today',value:String(st.jobsCompletedToday??0),detail:`${st.jobsCreatedToday??0} jobs created today`},
     {label:'ST Completed Revenue',value:money.format(Number(st.completedJobRevenueToday??0)),detail:'Completed ServiceTitan job totals today'},
     {label:'ST Invoiced Today',value:money.format(Number(st.invoiceTotalToday??0)),detail:'Invoice total dated today'},
@@ -43,12 +46,23 @@ export default async function DashboardPage() {
     {label:'ST Open A/R',value:money.format(Number(st.openAr??0)),detail:`${Number(st.totalInvoices??0).toLocaleString()} invoices cached`},
     {label:'ST Memberships',value:Number(st.activeMemberships??0).toLocaleString(),detail:'Active memberships in the staged feed'},
   ]:[];
+  const ef=(estimateFunnelData??null) as any;
+  const estimateAvailable=ownerRole&&!estimateFunnelError&&ef&&Number(ef.estimatesCreated??0)>0;
+  const estimateCards=estimateAvailable?[
+    {label:'30-Day Estimates',value:Number(ef.estimatesCreated??0).toLocaleString(),detail:`${Number(ef.openOrOtherEstimates??0)} still open/other`},
+    {label:'Decided Close Rate',value:`${Number(ef.decidedCloseRate??0).toFixed(1)}%`,detail:'Sold ÷ sold + dismissed'},
+    {label:'Created → Sold',value:`${Number(ef.createdToSoldRate??0).toFixed(1)}%`,detail:'All created estimates in period'},
+    {label:'Sold Estimate Revenue',value:money.format(Number(ef.soldRevenue??0)),detail:`${Number(ef.soldEstimates??0)} sold estimates`},
+    {label:'Avg Sold Estimate',value:money.format(Number(ef.averageSoldEstimate??0)),detail:`${Number(ef.dismissedEstimates??0)} dismissed`},
+  ]:[];
 
   return <main style={{fontFamily:'system-ui',maxWidth:1280,margin:'auto',padding:32}}>
     <header><p style={{fontWeight:800,letterSpacing:1}}>DURFEE PERFORMANCE AI</p><h1>Owner Command Center</h1><p>Live operating data with financial and workflow guardrails.</p></header>
     <section style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:16,margin:'28px 0'}}>{cards.map(card=><article key={card.label} style={{border:'1px solid #ddd',borderRadius:18,padding:20}}><small>{card.label}</small><h2>{card.value}</h2><p>{card.detail}</p></article>)}</section>
     {gpQueue.length>0&&managerRole&&<aside style={{border:'2px solid #b45309',borderRadius:16,padding:18,margin:'18px 0'}}><h2 style={{marginTop:0}}>Profitability approval needed</h2><p><b>{gpQueue.length}</b> low-GP job{gpQueue.length===1?' is':'s are'} waiting for owner/manager review before closeout.</p><p><Link href="/jobs/gp-approvals">Review low-GP closeouts →</Link></p></aside>}
-    {user.role==='owner'?<section style={{margin:'32px 0'}}><div style={{display:'flex',justifyContent:'space-between',gap:16,alignItems:'baseline',flexWrap:'wrap'}}><div><h2 style={{marginBottom:4}}>ServiceTitan Live Snapshot</h2><p style={{marginTop:0}}>Read-only production data from the staged ServiceTitan connector. Native Durfee AI records are not being overwritten.</p></div><Link href="/settings/integrations/servicetitan">Open integration health →</Link></div>{stAvailable?<><section style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:16,margin:'18px 0'}}>{stCards.map(card=><article key={card.label} style={{border:'1px solid #ddd',borderRadius:18,padding:20}}><small>{card.label}</small><h2>{card.value}</h2><p>{card.detail}</p></article>)}</section><p><small>{Number(st.totalCustomers??0).toLocaleString()} customers • {Number(st.totalJobs??0).toLocaleString()} jobs • {Number(st.totalPayments??0).toLocaleString()} payments cached. Last staged update: {when(st.lastSyncedAt)}.</small></p></>:<article style={{border:'1px solid #ddd',borderRadius:18,padding:20}}><strong>ServiceTitan snapshot unavailable</strong><p>{serviceTitanError?.message??'No staged ServiceTitan data is available yet.'}</p></article>}</section>:null}
+    {ownerRole?<section style={{margin:'32px 0'}}><div style={{display:'flex',justifyContent:'space-between',gap:16,alignItems:'baseline',flexWrap:'wrap'}}><div><h2 style={{marginBottom:4}}>ServiceTitan Live Snapshot</h2><p style={{marginTop:0}}>Read-only production data from the staged ServiceTitan connector. Native Durfee AI records are not being overwritten.</p></div><Link href="/settings/integrations/servicetitan">Open integration health →</Link></div>{stAvailable?<><section style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:16,margin:'18px 0'}}>{stCards.map(card=><article key={card.label} style={{border:'1px solid #ddd',borderRadius:18,padding:20}}><small>{card.label}</small><h2>{card.value}</h2><p>{card.detail}</p></article>)}</section><p><small>{Number(st.totalCustomers??0).toLocaleString()} customers • {Number(st.totalJobs??0).toLocaleString()} jobs • {Number(st.totalPayments??0).toLocaleString()} payments cached. Last staged update: {when(st.lastSyncedAt)}.</small></p></>:<article style={{border:'1px solid #ddd',borderRadius:18,padding:20}}><strong>ServiceTitan snapshot unavailable</strong><p>{serviceTitanError?.message??'No staged ServiceTitan data is available yet.'}</p></article>}
+      <div style={{marginTop:24}}><h3>Estimate Sales Funnel — Last 30 Days</h3>{estimateAvailable?<section style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:16,margin:'14px 0'}}>{estimateCards.map(card=><article key={card.label} style={{border:'1px solid #ddd',borderRadius:18,padding:18}}><small>{card.label}</small><h2>{card.value}</h2><p>{card.detail}</p></article>)}</section>:<article style={{border:'1px solid #ddd',borderRadius:18,padding:18}}><strong>Estimate funnel waiting for synced estimates</strong><p>{estimateFunnelError?.message??'Run the ServiceTitan estimate or one-click sync to populate true close-rate reporting.'}</p></article>}<p><small>Close rate uses real ServiceTitan estimate status. Technician sold-by attribution remains separate because unsold estimates do not always contain a reliable salesperson denominator.</small></p></div>
+    </section>:null}
     <section style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:18}}>
       <article style={{border:'1px solid #ddd',borderRadius:18,padding:22}}><h2>Profitability</h2>{belowFloor?<p>🔴 {belowFloor} completed job{belowFloor===1?'':'s'} below the {floor.toFixed(1)}% GP floor today.</p>:<p>✅ No completed jobs today are below the GP floor.</p>}<p><Link href="/reports/profitability">Open technician & service GP scorecards →</Link></p>{['owner','manager'].includes(user.role)&&<p><Link href="/reports/profitability/coach">Open Profitability Coach →</Link></p>}</article>
       <article style={{border:'1px solid #ddd',borderRadius:18,padding:22}}><h2>Price Book Learning</h2><p><b>{pendingLearning??0}</b> pending evidence-based proposal{pendingLearning===1?'':'s'}.</p><p><Link href="/pricebook/learning">Review price-book learning →</Link></p></article>

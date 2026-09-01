@@ -7,10 +7,20 @@ const routePermissions:[string,string][]=[['/settings/permissions','manage_permi
 const publicPaths=['/login','/approve/','/join/','/unauthorized'];
 
 export async function middleware(request:NextRequest){
-  const requestHeaders=new Headers(request.headers);requestHeaders.set('x-durfee-pathname',request.nextUrl.pathname);let response=NextResponse.next({request:{headers:requestHeaders}});
+  const path=request.nextUrl.pathname;
+  const requestHeaders=new Headers(request.headers);requestHeaders.set('x-durfee-pathname',path);
+  let response=NextResponse.next({request:{headers:requestHeaders}});
+
+  // Public token/login routes do not need an Auth round trip. Keeping these paths
+  // completely local also prevents a transient Auth/Data API slowdown from
+  // blocking customer estimate approvals or employee invite pages.
+  if(publicPaths.some(p=>path===p||path.startsWith(p+'/')))return response;
+
   const supabase=createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL||fallbackUrl,process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY||fallbackPublishableKey,{cookies:{getAll(){return request.cookies.getAll()},setAll(cookiesToSet){cookiesToSet.forEach(({name,value})=>request.cookies.set(name,value));response=NextResponse.next({request:{headers:requestHeaders}});cookiesToSet.forEach(({name,value,options})=>response.cookies.set(name,value,options));}}});
-  const {data:{user}}=await supabase.auth.getUser();const path=request.nextUrl.pathname;if(publicPaths.some(p=>path===p||path.startsWith(p+'/')))return response;if(!user)return response;
-  const match=routePermissions.find(([prefix])=>path===prefix||path.startsWith(prefix+'/'));if(match){const {data:allowed,error}=await supabase.rpc('has_permission_for_current_user',{p_key:match[1]});if(error||allowed!==true){const url=request.nextUrl.clone();url.pathname='/unauthorized';url.search='';url.searchParams.set('permission',match[1]);return NextResponse.redirect(url);}}
+  const {data:{user}}=await supabase.auth.getUser();
+  if(!user)return response;
+  const match=routePermissions.find(([prefix])=>path===prefix||path.startsWith(prefix+'/'));
+  if(match){const {data:allowed,error}=await supabase.rpc('has_permission_for_current_user',{p_key:match[1]});if(error||allowed!==true){const url=request.nextUrl.clone();url.pathname='/unauthorized';url.search='';url.searchParams.set('permission',match[1]);return NextResponse.redirect(url);}}
   return response;
 }
 export const config={matcher:['/((?!_next/static|_next/image|favicon.ico).*)']};

@@ -1,0 +1,15 @@
+create index if not exists employee_invites_created_by_idx on public.employee_invites(created_by);
+create index if not exists estimate_acceptance_links_created_by_idx on public.estimate_acceptance_links(created_by);
+create index if not exists inventory_locations_assigned_user_id_idx on public.inventory_locations(assigned_user_id);
+create index if not exists job_attachments_uploaded_by_idx on public.job_attachments(uploaded_by);
+create index if not exists job_material_staging_created_by_idx on public.job_material_staging(created_by);
+create index if not exists job_notes_author_user_id_idx on public.job_notes(author_user_id);
+create index if not exists price_book_learning_proposals_reviewed_by_idx on public.price_book_learning_proposals(reviewed_by);
+create index if not exists purchase_order_documents_uploaded_by_idx on public.purchase_order_documents(uploaded_by);
+create index if not exists role_permissions_permission_key_idx on public.role_permissions(permission_key);
+create index if not exists user_permission_overrides_permission_key_idx on public.user_permission_overrides(permission_key);
+create index if not exists user_permission_overrides_updated_by_idx on public.user_permission_overrides(updated_by);
+create index if not exists vendor_bill_drafts_approved_by_idx on public.vendor_bill_drafts(approved_by);
+create index if not exists zero_invoice_closeout_approvals_requested_by_idx on public.zero_invoice_closeout_approvals(requested_by);
+create index if not exists zero_invoice_closeout_approvals_approved_by_idx on public.zero_invoice_closeout_approvals(approved_by);
+create index if not exists zero_invoice_closeout_approvals_rejected_by_idx on public.zero_invoice_closeout_approvals(rejected_by);

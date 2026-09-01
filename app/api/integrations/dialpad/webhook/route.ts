@@ -22,7 +22,7 @@ function parseCustomData(payload:AnyRecord){
   if(typeof raw==='string'){try{return JSON.parse(raw) as AnyRecord;}catch{return {} as AnyRecord;}}
   return {} as AnyRecord;
 }
-function directionOf(payload:AnyRecord){
+function directionOf(payload:AnyRecord):'inbound'|'outbound'{
   const raw=String(payload.direction??payload.call_direction??payload.sms_direction??'').toLowerCase();
   return raw.includes('inbound')||raw==='in'?'inbound':'outbound';
 }
@@ -44,11 +44,11 @@ function phoneAddresses(payload:AnyRecord,direction:'inbound'|'outbound'){
   const internal=firstText(payload.internal_number,payload.target?.phone_number,payload.office_number,payload.user_number);
   return direction==='inbound'?{from:external,to:internal}:{from:internal,to:external};
 }
-function smsAddresses(payload:AnyRecord,direction:'inbound'|'outbound'){
+function smsAddresses(payload:AnyRecord){
   const from=firstText(payload.from_number,payload.from,payload.sender_number,payload.sender?.phone_number);
   const list=Array.isArray(payload.to_numbers)?payload.to_numbers:[];
   const to=firstText(payload.to_number,list[0],payload.to,payload.recipient_number);
-  return {from:direction==='inbound'?from:from,to:direction==='inbound'?to:to};
+  return {from,to};
 }
 function durationSeconds(payload:AnyRecord){
   const value=Number(payload.duration_seconds??payload.duration??payload.call_duration);
@@ -67,12 +67,12 @@ export async function POST(request:Request){
   }
 
   const admin=createSupabaseAdminClient();
-  const channel:isCall extends never?never:'phone'|'sms'=isCall(payload)?'phone':'sms';
+  const channel:'phone'|'sms'=isCall(payload)?'phone':'sms';
   const direction=directionOf(payload);
   const providerEventId=dialpadProviderEventId(payload);
   const occurredAt=eventDate(payload);
   const custom=parseCustomData(payload);
-  const addresses=channel==='phone'?phoneAddresses(payload,direction):smsAddresses(payload,direction);
+  const addresses=channel==='phone'?phoneAddresses(payload,direction):smsAddresses(payload);
 
   let existing:any=null;
   if(providerEventId){
@@ -93,7 +93,6 @@ export async function POST(request:Request){
     return NextResponse.json({ok:true,matched:false},{status:202});
   }
 
-  // Never attach an arbitrary job from provider data unless it belongs to the matched customer.
   if(jobId){
     const {data}=await admin.from('jobs').select('id').eq('id',jobId).eq('customer_id',customerId).maybeSingle();
     if(!data)jobId=null;

@@ -71,9 +71,18 @@ export async function POST(request:Request){
   const direction=directionOf(payload);
   const providerEventId=dialpadProviderEventId(payload);
   const occurredAt=eventDate(payload);
+  const eventState=String(payload.call_state??payload.state??payload.delivery_status??payload.status??payload.event_type??'event');
+  const eventKey=`${providerEventId||'unidentified'}|${occurredAt}|${eventState}`.slice(0,500);
+  const journal=await admin.rpc('ingest_dialpad_webhook_event',{p_event_key:eventKey,p_provider_event_id:providerEventId,p_event_timestamp:occurredAt,p_payload:payload});
+  if(journal.error)console.error('Dialpad event journal failed',journal.error.message);
+
+  const finish=async(error:string|null)=>{
+    const result=await admin.rpc('finish_dialpad_webhook_event',{p_event_key:eventKey,p_error:error});
+    if(result.error)console.error('Dialpad event journal completion failed',result.error.message);
+  };
+
   const custom=parseCustomData(payload);
   const addresses=channel==='phone'?phoneAddresses(payload,direction):smsAddresses(payload);
-
   let existing:any=null;
   if(providerEventId){
     const {data}=await admin.from('customer_communications').select('id,customer_id,job_id').eq('provider','dialpad').eq('provider_event_id',providerEventId).maybeSingle();
@@ -89,6 +98,7 @@ export async function POST(request:Request){
   }
 
   if(!customerId){
+    await finish('Customer match pending');
     console.warn('Dialpad event could not be matched to a customer',{providerEventId,channel,direction});
     return NextResponse.json({ok:true,matched:false},{status:202});
   }
@@ -99,34 +109,24 @@ export async function POST(request:Request){
   }
 
   const values={
-    customer_id:customerId,
-    job_id:jobId||null,
-    channel,
-    direction,
-    event_type:channel==='phone'?'call':'message',
-    status:statusOf(payload,channel,direction),
-    from_address:addresses.from,
-    to_address:addresses.to,
-    subject:null,
+    customer_id:customerId,job_id:jobId||null,channel,direction,event_type:channel==='phone'?'call':'message',
+    status:statusOf(payload,channel,direction),from_address:addresses.from,to_address:addresses.to,subject:null,
     body:channel==='sms'?firstText(payload.text,payload.message,payload.content,payload.body):null,
-    provider:'dialpad',
-    provider_event_id:providerEventId,
-    occurred_at:occurredAt,
+    provider:'dialpad',provider_event_id:providerEventId,occurred_at:occurredAt,
     duration_seconds:channel==='phone'?durationSeconds(payload):null,
     recording_url:channel==='phone'?firstText(payload.recording_url,payload.recording?.url,payload.recordingUrl):null,
-    transcript:null,
-    ai_summary:null,
-    disposition:firstText(payload.disposition,payload.result),
-    updated_at:new Date().toISOString(),
+    transcript:null,ai_summary:null,disposition:firstText(payload.disposition,payload.result),updated_at:new Date().toISOString(),
   };
 
-  if(existing?.id){
-    const {error}=await admin.from('customer_communications').update(values).eq('id',existing.id);
-    if(error){console.error('Dialpad communication update failed',error.message);return NextResponse.json({ok:false},{status:500});}
-  }else{
-    const {error}=await admin.from('customer_communications').insert(values);
-    if(error){console.error('Dialpad communication insert failed',error.message);return NextResponse.json({ok:false},{status:500});}
+  const operation=existing?.id
+    ?await admin.from('customer_communications').update(values).eq('id',existing.id)
+    :await admin.from('customer_communications').insert(values);
+  if(operation.error){
+    await finish(operation.error.message);
+    console.error('Dialpad communication write failed',operation.error.message);
+    return NextResponse.json({ok:false},{status:500});
   }
 
+  await finish(null);
   return NextResponse.json({ok:true,matched:true});
 }

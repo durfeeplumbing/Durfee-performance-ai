@@ -44,20 +44,23 @@ export default async function TeamPage(){
   ]);
 
   const floor=Number(settings?.minimum_gp??50);
-  const [st,prod,funnel,recalls]=mgmt
+  const [st,prod,jobSales,estimateSales,recalls]=mgmt
     ?await Promise.all([
       s.rpc('service_titan_technician_sales_performance',{p_days:30}),
       s.rpc('service_titan_technician_productivity',{p_days:30}),
       s.rpc('service_titan_technician_sales_funnel',{p_days:30}),
+      s.rpc('service_titan_estimate_funnel',{p_days:30}),
       s.rpc('service_titan_recall_snapshot',{p_days:90}),
     ])
-    :[{data:null,error:null},{data:null,error:null},{data:null,error:null},{data:null,error:null}];
+    :[{data:null,error:null},{data:null,error:null},{data:null,error:null},{data:null,error:null},{data:null,error:null}];
 
   const stTechs:any[]=Array.isArray(st.data)?st.data:[];
   const p:any=prod.data??{};
   const pTechs:any[]=Array.isArray(p.technicians)?p.technicians:[];
   const cb:any[]=Array.isArray(callbacks.data)?callbacks.data:[];
-  const sf:any[]=Array.isArray(funnel.data)?funnel.data:[];
+  const legacyJobSales:any[]=Array.isArray(jobSales.data)?jobSales.data:[];
+  const ef:any=estimateSales.data??{};
+  const estimateTechs:any[]=Array.isArray(ef.technicians)?ef.technicians:[];
   const rec:any=recalls.data??{};
 
   const cards=(techs??[]).map((t:any)=>{
@@ -139,18 +142,40 @@ export default async function TeamPage(){
     </section>
 
     {mgmt&&<section style={{marginTop:34}}>
-      <h2>ServiceTitan Sales Funnel — Last 30 Days</h2>
-      <p>Sales attribution stays separate from field execution. “Jobs with estimate” is an opportunity-context signal, <b>not a true close-rate denominator</b> until estimate status/decision records are synced.</p>
-      {funnel.error?<p role="alert">Sales funnel unavailable: {funnel.error.message}</p>:<div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Technician','Jobs w/ Estimate','Sold Jobs','Completed Sold','Sold Revenue','Avg Sold Ticket','Recall Jobs'].map(x=><th key={x} style={{textAlign:'left',padding:9,borderBottom:'1px solid #ccc'}}>{x}</th>)}</tr></thead><tbody>{sf.map((x:any)=><tr key={x.technicianId}><td style={{padding:9}}><b>{x.name||'Unnamed'}</b></td><td>{x.jobsWithEstimate}</td><td>{x.soldJobs}</td><td>{x.completedSoldJobs}</td><td>{money.format(Number(x.soldRevenue??0))}</td><td>{money.format(Number(x.averageSoldTicket??0))}</td><td>{x.recallJobs}</td></tr>)}</tbody></table></div>}
-      <p><small>ServiceTitan also contains <b>{Number(rec.recalls??0)}</b> recall-linked jobs in the last 90 days. These are kept separate from manager-reviewed FSM callbacks because a ServiceTitan recall link alone does not establish preventability.</small></p>
+      <h2>ServiceTitan Estimate Funnel — Last 30 Days</h2>
+      {estimateSales.error?<p role="alert">Estimate funnel unavailable: {estimateSales.error.message}</p>:Number(ef.estimatesCreated??0)===0?<p>No ServiceTitan estimate records are synced yet. Use <Link href="/settings/integrations/servicetitan">ServiceTitan Integration</Link> → <b>Sync estimates</b>. The ServiceTitan app must have Sales &amp; Estimates → Estimates (Read).</p>:<>
+        <p>This uses actual ServiceTitan estimate records and sold/dismissed status instead of the job-level estimate-ID proxy.</p>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:10,margin:'16px 0'}}>
+          {[
+            ['Estimates Created',String(Number(ef.estimatesCreated??0))],
+            ['Sold',String(Number(ef.soldEstimates??0))],
+            ['Dismissed',String(Number(ef.dismissedEstimates??0))],
+            ['Open / Other',String(Number(ef.openOrOtherEstimates??0))],
+            ['Decided Close Rate',`${Number(ef.decidedCloseRate??0).toFixed(1)}%`],
+            ['Created → Sold',`${Number(ef.createdToSoldRate??0).toFixed(1)}%`],
+            ['Sold Revenue',money.format(Number(ef.soldRevenue??0))],
+            ['Avg Sold Estimate',money.format(Number(ef.averageSoldEstimate??0))],
+          ].map(([a,b])=><span key={a} style={{border:'1px solid #eee',borderRadius:12,padding:12}}><small>{a}</small><br/><b>{b}</b></span>)}
+        </div>
+        <p><small><b>Decided Close Rate</b> = sold ÷ (sold + dismissed) for estimates created during the period. Open estimates are not counted as losses. Created → Sold remains visible as a stricter pipeline-conversion measure.</small></p>
+        {estimateTechs.length>0&&<div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Sold By','Sold Estimates','Sold Revenue','Avg Sold Estimate'].map(x=><th key={x} style={{textAlign:'left',padding:9,borderBottom:'1px solid #ccc'}}>{x}</th>)}</tr></thead><tbody>{estimateTechs.filter((x:any)=>Number(x.soldEstimates??0)>0).map((x:any)=><tr key={x.technicianId}><td style={{padding:9}}><b>{x.name||'Unnamed'}</b></td><td>{x.soldEstimates}</td><td>{money.format(Number(x.soldRevenue??0))}</td><td>{money.format(Number(x.averageSoldEstimate??0))}</td></tr>)}</tbody></table></div>}
+        <p><small>A per-technician close rate is intentionally not shown yet. ServiceTitan&apos;s estimate record identifies <b>soldBy</b> on sold estimates, but that does not provide a reliable presenter/owner for every unsold estimate. The system will not assign an artificial denominator to technicians.</small></p>
+      </>}
+      <p><small>ServiceTitan also contains <b>{Number(rec.recalls??0)}</b> recall-linked jobs in the last 90 days. These stay separate from manager-reviewed FSM callbacks because a recall link alone does not establish preventability.</small></p>
     </section>}
+
+    {mgmt&&legacyJobSales.length>0&&<details style={{marginTop:24}}>
+      <summary>Legacy job-level sales context</summary>
+      <p>This is retained for comparison only. Jobs with estimate IDs are not used as the close-rate denominator.</p>
+      <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Technician','Jobs w/ Estimate','Sold Jobs','Completed Sold','Sold Revenue','Avg Sold Ticket','Recall Jobs'].map(x=><th key={x} style={{textAlign:'left',padding:9,borderBottom:'1px solid #ccc'}}>{x}</th>)}</tr></thead><tbody>{legacyJobSales.map((x:any)=><tr key={x.technicianId}><td style={{padding:9}}><b>{x.name||'Unnamed'}</b></td><td>{x.jobsWithEstimate}</td><td>{x.soldJobs}</td><td>{x.completedSoldJobs}</td><td>{money.format(Number(x.soldRevenue??0))}</td><td>{money.format(Number(x.averageSoldTicket??0))}</td><td>{x.recallJobs}</td></tr>)}</tbody></table></div>
+    </details>}
 
     {mgmt&&<section style={{marginTop:34}}>
       <h2>ServiceTitan Field Productivity</h2>
       {prod.error?<p role="alert">Productivity unavailable.</p>:Number(p.timesheetRecords??0)===0?<p>No job-timesheet records synced yet.</p>:<div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Technician','Completed','On-site Hrs','Dispatch → Arrival','Attributed Revenue','Revenue / On-site Hr'].map(x=><th key={x} style={{textAlign:'left',padding:9,borderBottom:'1px solid #ccc'}}>{x}</th>)}</tr></thead><tbody>{pTechs.map((x:any)=><tr key={x.technicianId}><td style={{padding:9}}><b>{x.name}</b></td><td>{x.jobsCompleted}</td><td>{Number(x.onsiteHours??0).toFixed(1)}</td><td>{Number(x.dispatchToArrivalHours??0).toFixed(1)} hr</td><td>{money.format(Number(x.attributedRevenue??0))}</td><td>{money.format(Number(x.revenuePerOnsiteHour??0))}</td></tr>)}</tbody></table></div>}
     </section>}
 
-    {mgmt&&stTechs.length>0&&<details style={{marginTop:24}}><summary>Legacy ServiceTitan sold-by snapshot</summary><p>{stTechs.length} technician records available. The sales funnel above supersedes this for management review.</p></details>}
+    {mgmt&&stTechs.length>0&&<details style={{marginTop:24}}><summary>Legacy ServiceTitan sold-by job snapshot</summary><p>{stTechs.length} technician records available. The estimate funnel above is the authoritative estimate-status view.</p></details>}
 
     <aside style={{marginTop:28,border:'2px solid #222',borderRadius:16,padding:18}}>
       <h2>Performance guardrail</h2>

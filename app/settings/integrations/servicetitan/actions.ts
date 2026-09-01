@@ -4,7 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { serviceTitanConnectionInfo, serviceTitanPages } from '@/lib/servicetitan';
 
-const STAGING_BATCH_SIZE = 200;
+const STAGING_BATCH_SIZE = 100;
+const MIN_SPLIT_BATCH_SIZE = 25;
+const TRANSIENT_RETRY_DELAYS_MS = [500, 1500];
 
 type OwnerSupabase = Awaited<ReturnType<typeof ownerClient>>;
 type SyncInfo = ReturnType<typeof serviceTitanConnectionInfo>;
@@ -18,9 +20,36 @@ async function ownerClient() {
   return supabase;
 }
 
-async function saveResourceBatch(supabase: OwnerSupabase, resource: string, records: unknown[], info: SyncInfo, offset: number) {
+const wait = (ms:number) => new Promise(resolve => setTimeout(resolve, ms));
+
+function transientSyncError(message:string) {
+  const m=message.toLowerCase();
+  return m.includes('statement timeout') || m.includes('canceling statement') || m.includes('520') || m.includes('gateway') || m.includes('fetch failed') || m.includes('network');
+}
+
+async function rpcResourceBatch(supabase: OwnerSupabase, resource: string, records: unknown[], info: SyncInfo) {
   const { error } = await supabase.rpc('upsert_service_titan_resource', { p_resource: resource, p_records: records, p_environment: info.environment, p_tenant_id: info.tenant });
-  if (error) throw new Error(`${resource} sync failed at records ${offset + 1}-${offset + records.length}: ${error.message}`);
+  return error?.message ?? null;
+}
+
+async function saveResourceBatch(supabase: OwnerSupabase, resource: string, records: unknown[], info: SyncInfo, offset: number):Promise<void> {
+  let lastError:string|null=null;
+  for(let attempt=0;attempt<=TRANSIENT_RETRY_DELAYS_MS.length;attempt++){
+    lastError=await rpcResourceBatch(supabase,resource,records,info);
+    if(!lastError)return;
+    if(!transientSyncError(lastError))break;
+    if(attempt<TRANSIENT_RETRY_DELAYS_MS.length)await wait(TRANSIENT_RETRY_DELAYS_MS[attempt]);
+  }
+
+  if(lastError&&transientSyncError(lastError)&&records.length>MIN_SPLIT_BATCH_SIZE){
+    const midpoint=Math.ceil(records.length/2);
+    const first=records.slice(0,midpoint),second=records.slice(midpoint);
+    await saveResourceBatch(supabase,resource,first,info,offset);
+    if(second.length)await saveResourceBatch(supabase,resource,second,info,offset+midpoint);
+    return;
+  }
+
+  throw new Error(`${resource} sync failed at records ${offset + 1}-${offset + records.length}: ${lastError ?? 'Unknown staging error'}`);
 }
 
 async function syncPagedResource(supabase: OwnerSupabase, resource: string, path: string, info: SyncInfo) {

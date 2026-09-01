@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const fallbackUrl='https://ksbmdgwiztlbthagzhpg.supabase.co';
 const fallbackPublishableKey='sb_publishable_Upwje6AofSbaZmFpPe8PIg_SsjATBk8';
-const routePermissions:[string,string][]=[['/settings/permissions','manage_permissions'],['/settings/pricing','manage_pricing_settings'],['/accounting','view_accounting'],['/purchasing','view_purchasing'],['/opportunities','view_opportunities'],['/staging','view_staging'],['/reports','view_reports'],['/inventory','view_inventory'],['/csr','view_csr'],['/team','view_team'],['/pricebook','view_pricebook'],['/billing','view_billing'],['/estimates','view_estimates'],['/customers','view_customers'],['/jobs','view_jobs'],['/dispatch','view_dispatch'],['/schedule','view_schedule'],['/field','field_app'],['/dashboard','view_dashboard']];
+const routePermissions:[string,string][]=[['/settings/permissions','manage_permissions'],['/settings/pricing','manage_pricing_settings'],['/accounting','view_accounting'],['/purchasing','view_purchasing'],['/opportunities','view_opportunities'],['/staging','view_staging'],['/reports','view_reports'],['/inventory','view_inventory'],['/reviews','view_csr'],['/csr','view_csr'],['/team','view_team'],['/pricebook','view_pricebook'],['/billing','view_billing'],['/estimates','view_estimates'],['/customers','view_customers'],['/jobs','view_jobs'],['/dispatch','view_dispatch'],['/schedule','view_schedule'],['/field','field_app'],['/dashboard','view_dashboard']];
 const publicPaths=['/login','/approve/','/join/','/unauthorized'];
 
 export async function middleware(request:NextRequest){

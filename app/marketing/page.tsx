@@ -16,7 +16,7 @@ export default async function MarketingPage(){
   const supabase=await createSupabaseServerClient();
   const canManage=['owner','manager','csr_dispatch'].includes(user.role);
   const collectorConfigured=Boolean((process.env.MARKETING_TRACKING_ALLOWED_ORIGINS||'').trim());
-  const [{data:summary,error:summaryError},{data:campaigns,error:campaignError},{data:customers},{data:jobs},{data:attribution},{data:platforms},{data:paidCampaigns},{data:touchpoints}]=await Promise.all([
+  const [{data:summary,error:summaryError},{data:campaigns,error:campaignError},{data:customers},{data:jobs},{data:attribution},{data:platforms},{data:paidCampaigns},{data:touchpoints},{data:diagnostics}]=await Promise.all([
     supabase.rpc('marketing_source_summary'),
     supabase.rpc('servicetitan_campaign_summary',{p_days:90}),
     canManage?supabase.from('customers').select('id,name').order('name').limit(500):Promise.resolve({data:[]}),
@@ -25,10 +25,12 @@ export default async function MarketingPage(){
     supabase.rpc('marketing_platform_summary',{p_days:30}),
     supabase.rpc('marketing_campaign_performance',{p_days:30,p_limit:50}),
     supabase.rpc('marketing_touchpoint_recent',{p_days:30,p_limit:20}),
+    supabase.rpc('marketing_attribution_diagnostics',{p_days:30}),
   ]);
   const rows:any[]=summaryError?[]:((summary as any[])??[]);
   const st:any[]=campaignError?[]:((campaigns as any[])??[]);
   const a:any=attribution??{};
+  const d:any=diagnostics??{};
   const platformRows:any[]=(platforms as any[])??[];
   const paidRows:any[]=(paidCampaigns as any[])??[];
   const touches:any[]=(touchpoints as any[])??[];
@@ -49,7 +51,12 @@ export default async function MarketingPage(){
       <article style={{border:'1px solid #ddd',borderRadius:16,padding:18}}><h2 style={{marginTop:0}}>Google Ads</h2>{platformRows.filter(r=>r.platform==='google_ads').length?platformRows.filter(r=>r.platform==='google_ads').map((r:any)=><p key={r.account_name||'google'}><b>{r.account_name||'Connected account'}</b><br/>{money.format(Number(r.spend??0))} spend • {number.format(Number(r.clicks??0))} clicks • {r.status}</p>):<p><b>Authorization pending.</b> The data model is ready for campaign, ad-group, ad, click-ID and offline conversion data.</p>}</article>
       <article style={{border:'1px solid #ddd',borderRadius:16,padding:18}}><h2 style={{marginTop:0}}>Facebook / Instagram</h2>{platformRows.filter(r=>r.platform==='meta_ads').length?platformRows.filter(r=>r.platform==='meta_ads').map((r:any)=><p key={r.account_name||'meta'}><b>{r.account_name||'Connected account'}</b><br/>{money.format(Number(r.spend??0))} spend • {number.format(Number(r.clicks??0))} clicks • {r.status}</p>):<p><b>Authorization pending.</b> The platform layer is ready for account, campaign, ad-set, ad and click-attribution data.</p>}</article>
       <article style={{border:'1px solid #ddd',borderRadius:16,padding:18}}><h2 style={{marginTop:0}}>Website Click Collector</h2><p><b>{collectorConfigured?'Configured':'Waiting for website origin'}</b></p><p>The first-party collector stores GCLID, GBRAID, WBRAID, FBCLID and UTM values without exposing Supabase credentials to the public website.</p><p><code>/api/marketing/track</code></p></article>
+      <article style={{border:'1px solid #ddd',borderRadius:16,padding:18}}><h2 style={{marginTop:0}}>Call Tracking</h2><p><b>{Number(d.trackingNumbers??0)>0?`${d.trackingNumbers} active tracking number${Number(d.trackingNumbers)===1?'':'s'}`:'Number pool not provisioned yet'}</b></p><p>Dynamic-number assignment is ready. When tracking numbers are provisioned, inbound Dialpad calls can resolve back to the visitor click/session and then to the customer and job.</p><p><code>/api/marketing/number</code></p></article>
     </section>
+
+    <section style={{margin:'28px 0'}}><h2>Attribution Health — 30 Days</h2><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:12}}>{[
+      ['Touchpoints',d.touchpoints??0],['Click IDs Captured',d.identified??0],['Calls Linked',d.linkedCalls??0],['Customers Linked',d.linkedCustomers??0],['Jobs Linked',d.linkedJobs??0],['Conversion Events',d.conversionEvents??0],['Google Pending',d.pendingGoogleConversions??0],['Meta Pending',d.pendingMetaConversions??0]
+    ].map(([label,value])=><article key={String(label)} style={{border:'1px solid #e5e7eb',borderRadius:14,padding:14}}><small>{label}</small><h3 style={{marginBottom:0}}>{number.format(Number(value??0))}</h3></article>)}</div><p><small>Pending provider conversions are staged only. Nothing is sent to Google or Meta until the business accounts are explicitly authorized.</small></p></section>
 
     {paidRows.length>0&&<section style={{marginTop:30}}><h2>Paid Campaign Performance — 30 Days</h2><div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse'}}><thead><tr>{['Platform','Campaign','Spend','Impressions','Clicks','Platform Conversions','Platform Value'].map(x=><th key={x} style={{textAlign:'left',padding:10,borderBottom:'1px solid #ccc'}}>{x}</th>)}</tr></thead><tbody>{paidRows.map((r:any)=><tr key={`${r.platform}:${r.campaign_external_id}`}><td style={{padding:10,borderBottom:'1px solid #eee'}}>{platformName(r.platform)}</td><td style={{padding:10,borderBottom:'1px solid #eee'}}><b>{r.campaign_name||r.campaign_external_id||'Unknown'}</b></td><td style={{padding:10,borderBottom:'1px solid #eee'}}>{money.format(Number(r.spend??0))}</td><td style={{padding:10,borderBottom:'1px solid #eee'}}>{number.format(Number(r.impressions??0))}</td><td style={{padding:10,borderBottom:'1px solid #eee'}}>{number.format(Number(r.clicks??0))}</td><td style={{padding:10,borderBottom:'1px solid #eee'}}>{Number(r.provider_conversions??0).toFixed(1)}</td><td style={{padding:10,borderBottom:'1px solid #eee'}}>{money.format(Number(r.provider_conversion_value??0))}</td></tr>)}</tbody></table></div></section>}
 

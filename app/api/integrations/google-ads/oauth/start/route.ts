@@ -7,7 +7,7 @@ export const runtime='nodejs';export const dynamic='force-dynamic';
 export async function GET(){
   const user=await getCurrentUser();if(!user)return NextResponse.json({error:'Authentication required'},{status:401});
   if(user.role!=='owner')return NextResponse.json({error:'Owner access required'},{status:403});
-  const clientId=process.env.GOOGLE_ADS_OAUTH_CLIENT_ID?.trim();if(!clientId)return NextResponse.redirect(`${marketingBaseUrl()}/marketing/connections?provider=google_ads&status=configuration_required`);
+  const clientId=process.env.GOOGLE_ADS_OAUTH_CLIENT_ID?.trim();if(!clientId)return NextResponse.redirect(`${marketingBaseUrl()}/marketing/providers?provider=google_ads&status=configuration_required`);
   const redirectUri=`${marketingBaseUrl()}/api/integrations/google-ads/oauth/callback`;
   const url=new URL('https://accounts.google.com/o/oauth2/v2/auth');
   url.searchParams.set('client_id',clientId);url.searchParams.set('redirect_uri',redirectUri);url.searchParams.set('response_type','code');

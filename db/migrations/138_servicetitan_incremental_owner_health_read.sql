@@ -1,0 +1,7 @@
+grant select on public.service_titan_incremental_sync_state to authenticated;
+grant select on public.service_titan_incremental_sync_guard to authenticated;
+
+drop policy if exists service_titan_incremental_guard_owner_read on public.service_titan_incremental_sync_guard;
+create policy service_titan_incremental_guard_owner_read on public.service_titan_incremental_sync_guard
+for select to authenticated
+using (public.has_permission_for_current_user('manage_permissions'));

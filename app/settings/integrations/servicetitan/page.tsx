@@ -113,7 +113,7 @@ export default async function ServiceTitanIntegrationPage() {
       </div>
     </details>
 
-    <p><small>The continuous fast lane currently covers customers, locations, jobs, appointments, estimates, invoices, payments and memberships using ServiceTitan's modified-date filters. Reference data and technician payroll activity remain on the controlled manual/full-sync path until their incremental behavior is separately validated.</small></p>
+    <p><small>The continuous fast lane currently covers customers, locations, jobs, appointments, estimates, invoices, payments and memberships using ServiceTitan modified-date filters. Reference data and technician payroll activity remain on the controlled manual/full-sync path until their incremental behavior is separately validated.</small></p>
     <p><small>The estimate feed requires the ServiceTitan app scope <b>Sales &amp; Estimates → Estimates (Read)</b>. All ServiceTitan sync is read-only from the ServiceTitan side.</small></p>
     <h2>Customer mapping review</h2>
     <p>Generate conservative match candidates against existing Durfee AI customers using normalized email and phone. Nothing is merged or created by this action.</p>

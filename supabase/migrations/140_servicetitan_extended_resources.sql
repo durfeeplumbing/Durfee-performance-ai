@@ -1,0 +1,2 @@
+alter table public.service_titan_records drop constraint if exists service_titan_records_resource_check;
+alter table public.service_titan_records add constraint service_titan_records_resource_check check(resource=any(array['technicians','business_units','customers','locations','jobs','appointments','estimates','job_timesheets','job_splits','invoices','payments','memberships','equipment','appointment_assignments']));

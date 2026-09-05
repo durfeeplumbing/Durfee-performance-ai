@@ -12,8 +12,64 @@ const publicPaths=['/login','/approve/','/join/','/unauthorized'];
 export const metadata={title:'Durfee Performance AI',description:'Standalone field service management and profitability platform'};
 
 export default async function RootLayout({children}:{children:ReactNode}){
-  const { headers }=await import('next/headers');const pathname=(await headers()).get('x-durfee-pathname')??'';if(publicPaths.some(path=>pathname===path||pathname.startsWith(path+'/')))return <html lang="en"><body>{children}</body></html>;const user=await getCurrentUser();if(!user)redirect('/login');
-  let allowed=new Set<string>();if(user.role==='owner'){allowed=new Set(nav.map(x=>x[2]));for(const p of ['field_app','manage_permissions','manage_pricing_settings','manage_team'])allowed.add(p);}else{const s=await createSupabaseServerClient();const {data:roleRows}=await s.from('role_permissions').select('permission_key,allowed').eq('role',user.role);const {data:overrides}=await s.from('user_permission_overrides').select('permission_key,allowed').eq('user_id',user.id);for(const r of roleRows??[])if(r.allowed)allowed.add(r.permission_key);for(const o of overrides??[]){if(o.allowed)allowed.add(o.permission_key);else allowed.delete(o.permission_key);}}
-  const visibleNav=nav.filter(x=>allowed.has(x[2]));if(['owner','manager','accounting'].includes(user.role)&&allowed.has('view_reports'))visibleNav.push(['GP Control','/reports/profitability','view_reports']);if(['owner','manager'].includes(user.role)&&allowed.has('view_pricebook'))visibleNav.push(['Price Learning','/pricebook/learning','view_pricebook']);if(['owner','manager','csr_dispatch'].includes(user.role)&&allowed.has('view_dispatch'))visibleNav.push(['Fleet Day Plan','/dispatch/fleet-optimizer','view_dispatch']);if(user.role==='owner')visibleNav.push(['ServiceTitan','/settings/integrations/servicetitan','view_dashboard']);if(allowed.has('manage_team'))visibleNav.push(['Employee Accounts','/team/accounts','manage_team']);if(allowed.has('manage_pricing_settings'))visibleNav.push(['Pricing Settings','/settings/pricing','manage_pricing_settings']);if(allowed.has('manage_permissions'))visibleNav.push(['Permissions','/settings/permissions','manage_permissions']);
-  return <html lang="en"><body><div className="shell"><aside className="sidebar"><div className="brand">DURFEE<br/><span>PERFORMANCE AI</span></div><nav>{visibleNav.map(([label,href])=><Link key={href} href={href}>{label}</Link>)}</nav>{allowed.has('field_app')&&<Link className="fieldLink" href="/field">Open Field App</Link>}<div style={{marginTop:20,fontSize:12,opacity:.8}}>{user.name}<br/>{user.role}</div><form action={logout}><button type="submit" style={{marginTop:10}}>Sign out</button></form></aside><div className="content"><div style={{position:'sticky',top:0,zIndex:900,background:'rgba(248,250,252,.96)',backdropFilter:'blur(10px)',padding:'14px 20px',borderBottom:'1px solid #e5e7eb',display:'flex',justifyContent:'center'}}><GlobalSearch/></div>{children}</div></div></body></html>;
+  const { headers }=await import('next/headers');
+  const pathname=(await headers()).get('x-durfee-pathname')??'';
+  if(publicPaths.some(path=>pathname===path||pathname.startsWith(path+'/')))return <html lang="en"><body>{children}</body></html>;
+
+  const user=await getCurrentUser();
+  if(!user)redirect('/login');
+
+  let allowed=new Set<string>();
+  if(user.role==='owner'){
+    allowed=new Set(nav.map(x=>x[2]));
+    for(const p of ['field_app','manage_permissions','manage_pricing_settings','manage_team'])allowed.add(p);
+  }else{
+    const s=await createSupabaseServerClient();
+    const {data:roleRows}=await s.from('role_permissions').select('permission_key,allowed').eq('role',user.role);
+    const {data:overrides}=await s.from('user_permission_overrides').select('permission_key,allowed').eq('user_id',user.id);
+    for(const r of roleRows??[])if(r.allowed)allowed.add(r.permission_key);
+    for(const o of overrides??[]){if(o.allowed)allowed.add(o.permission_key);else allowed.delete(o.permission_key);}
+  }
+
+  const visibleNav=nav.filter(x=>allowed.has(x[2]));
+  if(['owner','manager','accounting'].includes(user.role)&&allowed.has('view_reports'))visibleNav.push(['GP Control','/reports/profitability','view_reports']);
+  if(['owner','manager'].includes(user.role)&&allowed.has('view_pricebook'))visibleNav.push(['Price Learning','/pricebook/learning','view_pricebook']);
+  if(['owner','manager','csr_dispatch'].includes(user.role)&&allowed.has('view_dispatch'))visibleNav.push(['Fleet Day Plan','/dispatch/fleet-optimizer','view_dispatch']);
+
+  const settingsLinks:Array<[string,string,string]> = [];
+  if(user.role==='owner'){
+    settingsLinks.push(['ServiceTitan Integration','/settings/integrations/servicetitan','ServiceTitan sync, staging and migration controls']);
+    settingsLinks.push(['Migration Readiness','/settings/migration-readiness','Cutover checks and migration status']);
+  }
+  if(allowed.has('manage_team'))settingsLinks.push(['Employee Accounts','/team/accounts','User access and employee accounts']);
+  if(allowed.has('manage_pricing_settings'))settingsLinks.push(['Pricing Settings','/settings/pricing','Pricing rules and business settings']);
+  if(allowed.has('manage_permissions'))settingsLinks.push(['Permissions','/settings/permissions','Role and user permissions']);
+
+  return <html lang="en"><body><div className="shell">
+    <aside className="sidebar">
+      <div className="brand">DURFEE<br/><span>PERFORMANCE AI</span></div>
+      <nav>{visibleNav.map(([label,href])=><Link key={href} href={href}>{label}</Link>)}</nav>
+      {allowed.has('field_app')&&<Link className="fieldLink" href="/field">Open Field App</Link>}
+      <div style={{marginTop:20,fontSize:12,opacity:.8}}>{user.name}<br/>{user.role}</div>
+      <form action={logout}><button type="submit" style={{marginTop:10}}>Sign out</button></form>
+    </aside>
+
+    <div className="content">
+      <div style={{position:'sticky',top:0,zIndex:900,background:'rgba(248,250,252,.96)',backdropFilter:'blur(10px)',padding:'12px 18px',borderBottom:'1px solid #e5e7eb',display:'grid',gridTemplateColumns:'minmax(0,1fr) auto',gap:14,alignItems:'center'}}>
+        <div style={{display:'flex',justifyContent:'center',minWidth:0}}><GlobalSearch/></div>
+        <details style={{position:'relative'}}>
+          <summary aria-label="Open settings" title="Settings" style={{listStyle:'none',cursor:'pointer',width:42,height:42,border:'1px solid #d1d5db',borderRadius:12,display:'grid',placeItems:'center',background:'#fff',fontSize:22,lineHeight:1,userSelect:'none'}}>⚙</summary>
+          <div style={{position:'absolute',right:0,top:'calc(100% + 8px)',width:320,maxWidth:'calc(100vw - 32px)',background:'#fff',border:'1px solid #d1d5db',borderRadius:14,boxShadow:'0 16px 40px rgba(15,23,42,.16)',padding:10,zIndex:1000}}>
+            <div style={{padding:'8px 10px 10px',borderBottom:'1px solid #eee',marginBottom:6}}>
+              <div style={{fontWeight:850}}>Settings</div>
+              <small style={{color:'#666'}}>System configuration & administration</small>
+            </div>
+            {settingsLinks.map(([label,href,description])=><Link key={href} href={href} style={{display:'block',padding:'10px 11px',borderRadius:9,textDecoration:'none',color:'inherit'}}><div style={{fontWeight:750}}>{label}</div><small style={{color:'#666'}}>{description}</small></Link>)}
+            {!settingsLinks.length&&<div style={{padding:12,color:'#666'}}>No settings are available for your role.</div>}
+          </div>
+        </details>
+      </div>
+      {children}
+    </div>
+  </div></body></html>;
 }

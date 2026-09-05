@@ -1,0 +1,3 @@
+alter table public.service_titan_incremental_sync_state drop constraint service_titan_incremental_sync_state_resource_check;
+alter table public.service_titan_incremental_sync_state add constraint service_titan_incremental_sync_state_resource_check check(resource=any(array['customers','locations','jobs','appointments','estimates','invoices','payments','memberships','technicians']));
+insert into public.service_titan_incremental_sync_state(resource,enabled) values('technicians',true) on conflict(resource) do nothing;

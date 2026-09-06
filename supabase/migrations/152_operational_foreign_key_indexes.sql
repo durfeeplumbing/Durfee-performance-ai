@@ -1,0 +1,1 @@
+create index if not exists idx_equipment_service_events_technician on public.equipment_service_events(technician_id); create index if not exists idx_post_job_followups_customer on public.post_job_followups(customer_id); create index if not exists idx_payment_requests_created_by on public.payment_requests(created_by);

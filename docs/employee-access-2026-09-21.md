@@ -19,9 +19,13 @@ Continues the existing standalone Durfee Performance AI app. ServiceTitan integr
 - `tests/employee-access.sql` passed 36 checks across all six roles against the existing database, including override precedence and inactive-account denial. All generated test data rolled back.
 - Nine local production HTTP/action checks passed: login and setup messages, unavailable invite, restricted access, anonymous root redirect, callback failure/redirect confinement, and empty-login validation.
 
-## Pilot still required
+## Authenticated pilot and remaining checks
 
-An employee must complete a real browser sign-in, then walk through the authenticated workflow. No real employee credentials were requested, changed, or created during automated verification.
+Owner sign-in was completed through the secure browser prompt. The preview opened the Command Center as Phillip Durfee with the owner role and the expected navigation. No employee password was changed or copied into source.
+
+The authenticated check exposed a pre-existing timeout in the deferred ServiceTitan snapshot. The snapshot and estimate-funnel queries now remain disabled unless `SERVICETITAN_DASHBOARD_ENABLED=true`; standalone dashboard data remains available.
+
+The full customer-to-payment UI pilot and other employee roles still need browser verification.
 
 Email confirmation delivery is not tested. Where `NEXT_PUBLIC_APP_URL` is configured, its `/auth/callback` URL must be included in the Supabase Auth redirect allowlist. PKCE confirmation must be opened in the same browser that started signup. If no app URL is set, Supabase's configured redirect remains in use.
 

@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/session';
-import { makeMarketingOAuthState,marketingBaseUrl } from '@/lib/integrations/marketing-oauth';
+import { makeMarketingOAuthState,marketingBaseUrl,marketingOAuthMissingSettings } from '@/lib/integrations/marketing-oauth';
 
 export const runtime='nodejs';export const dynamic='force-dynamic';
 
 export async function GET(){
   const user=await getCurrentUser();if(!user)return NextResponse.json({error:'Authentication required'},{status:401});
   if(user.role!=='owner')return NextResponse.json({error:'Owner access required'},{status:403});
+  if(marketingOAuthMissingSettings('meta_ads').length)return NextResponse.redirect(`${marketingBaseUrl()}/marketing/providers?provider=meta_ads&status=configuration_required`);
   const appId=process.env.META_ADS_APP_ID?.trim(),version=process.env.META_GRAPH_VERSION?.trim();
   if(!appId||!version)return NextResponse.redirect(`${marketingBaseUrl()}/marketing/providers?provider=meta_ads&status=configuration_required`);
   const redirectUri=`${marketingBaseUrl()}/api/integrations/meta-ads/oauth/callback`;

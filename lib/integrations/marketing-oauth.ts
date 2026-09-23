@@ -1,5 +1,6 @@
 import 'server-only';
 import crypto from 'node:crypto';
+import { supabaseAdminReady } from '@/lib/supabase/admin';
 
 export type MarketingProvider='google_ads'|'meta_ads';
 
@@ -32,7 +33,20 @@ export function verifyMarketingOAuthState(state:string,provider:MarketingProvide
 }
 export function marketingBaseUrl(){return (process.env.APP_BASE_URL||'https://durfee-performance-ai.vercel.app').replace(/\/$/,'')}
 export function marketingOAuthReadiness(){return {
-  secret:Boolean(process.env.MARKETING_OAUTH_SECRET?.trim()),
+  secret:(process.env.MARKETING_OAUTH_SECRET?.trim().length||0)>=32,
+  database:supabaseAdminReady(),
   googleClient:Boolean(process.env.GOOGLE_ADS_OAUTH_CLIENT_ID?.trim()&&process.env.GOOGLE_ADS_OAUTH_CLIENT_SECRET?.trim()),
   metaClient:Boolean(process.env.META_ADS_APP_ID?.trim()&&process.env.META_ADS_APP_SECRET?.trim()),
 };}
+
+export function marketingOAuthMissingSettings(provider:MarketingProvider){
+  const ready=marketingOAuthReadiness();
+  const missing:string[]=[];
+  if(!ready.database)missing.push('SUPABASE_SECRET_KEY');
+  if(!ready.secret)missing.push('MARKETING_OAUTH_SECRET (at least 32 characters)');
+  const names=provider==='google_ads'
+    ? ['GOOGLE_ADS_OAUTH_CLIENT_ID','GOOGLE_ADS_OAUTH_CLIENT_SECRET']
+    : ['META_ADS_APP_ID','META_ADS_APP_SECRET','META_GRAPH_VERSION'];
+  for(const name of names)if(!process.env[name]?.trim())missing.push(name);
+  return missing;
+}

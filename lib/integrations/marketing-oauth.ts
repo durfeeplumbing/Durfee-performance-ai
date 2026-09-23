@@ -34,6 +34,5 @@ export function marketingBaseUrl(){return (process.env.APP_BASE_URL||'https://du
 export function marketingOAuthReadiness(){return {
   secret:Boolean(process.env.MARKETING_OAUTH_SECRET?.trim()),
   googleClient:Boolean(process.env.GOOGLE_ADS_OAUTH_CLIENT_ID?.trim()&&process.env.GOOGLE_ADS_OAUTH_CLIENT_SECRET?.trim()),
-  googleDeveloperToken:Boolean(process.env.GOOGLE_ADS_DEVELOPER_TOKEN?.trim()),
   metaClient:Boolean(process.env.META_ADS_APP_ID?.trim()&&process.env.META_ADS_APP_SECRET?.trim()),
 };}

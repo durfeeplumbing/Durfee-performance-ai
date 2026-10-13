@@ -39,6 +39,7 @@ export default async function MarketingPage(){
   const revenue=rows.reduce((s,r)=>s+Number(r.booked_revenue??0),0);
   const spend=Number(a.spend??0),attribRevenue=Number(a.revenue??0),roas=a.roas==null?null:Number(a.roas),cpb=a.costPerBookedJob==null?null:Number(a.costPerBookedJob);
   return <main style={{fontFamily:'system-ui',maxWidth:1380,margin:'auto',padding:32}}>
+    <p><Link href="/marketing/website">Open Website &amp; Calls →</Link></p>
     <header><p style={{fontWeight:800,letterSpacing:1}}>MARKETING ATTRIBUTION</p><h1>Marketing Command Center</h1><p>Trace paid clicks and calls through customer, job, invoice and payment outcomes. Durfee revenue remains the source of truth; ad-platform conversion counts are supporting signals.</p></header>
 
     <section style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:14,margin:'24px 0'}}>

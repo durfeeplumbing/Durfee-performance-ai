@@ -1,7 +1,7 @@
 export const eventKinds = ['page_view','call_click','text_click','form_open','scheduler_open'] as const;
 export type WebsiteEventKind = typeof eventKinds[number];
 export function safeWebsitePath(value: unknown): string | null {
-  if (typeof value !== 'string' || value.length > 2000) return null;
+  if (typeof value !== 'string' || value.length > 2000 || !/^(?:\/|https:\/\/)/i.test(value.trim())) return null;
   try {
     const url = new URL(value, 'https://capecodplumber.com');
     if (!['capecodplumber.com','www.capecodplumber.com'].includes(url.hostname) || url.protocol !== 'https:') return null;

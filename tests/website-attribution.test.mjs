@@ -12,3 +12,5 @@ test('call page attribution requires an explicit call ID',()=>{const calls=[{id:
 test('job revenue is counted once and ambiguous pages get no revenue credit',()=>{const calls=[{jobId:'10',landingPage:'/drains'},{jobId:'10',landingPage:'/drains'}];const jobs=[{id:10,total:300,jobStatus:'Completed'}];let r=attribution.uniquePageJobRevenue(calls,jobs);assert.equal(r.pages.get('/drains').jobTotal,300);assert.equal(r.pages.get('/drains').jobs,1);r=attribution.uniquePageJobRevenue([...calls,{jobId:'10',landingPage:'/plumbing'}],jobs);assert.equal(r.pages.size,0);assert.equal(r.ambiguousJobs,1);});
 
 test('telecom bundle uses the lead call ID and missing jobs are unavailable',()=>{const c=attribution.normalizeCall({id:900,leadCall:{id:123,receivedOn:'2026-10-13T10:00:00Z',direction:'Inbound'}});assert.equal(c.id,'123');assert.equal(c.jobId,null);assert.equal(attribution.uniquePageJobRevenue([{jobId:'99',landingPage:'/drains'}],[]).pages.get('/drains').missingJobs,1);});
+
+test('missing attribution does not become a homepage visit',()=>{for(const v of ['', ' ', 'unknown', '?source=google', null])assert.equal(events.safeWebsitePath(v),null);});

@@ -14,3 +14,5 @@ test('job revenue is counted once and ambiguous pages get no revenue credit',()=
 test('telecom bundle uses the lead call ID and missing jobs are unavailable',()=>{const c=attribution.normalizeCall({id:900,leadCall:{id:123,receivedOn:'2026-10-13T10:00:00Z',direction:'Inbound'}});assert.equal(c.id,'123');assert.equal(c.jobId,null);assert.equal(attribution.uniquePageJobRevenue([{jobId:'99',landingPage:'/drains'}],[]).pages.get('/drains').missingJobs,1);});
 
 test('missing attribution does not become a homepage visit',()=>{for(const v of ['', ' ', 'unknown', '?source=google', null])assert.equal(events.safeWebsitePath(v),null);});
+
+test('ServiceTitan host/path format retains only our site paths',()=>{assert.equal(events.safeWebsitePath('capecodplumber.com/services/drains?gclid=123'),'/services/drains');assert.equal(events.safeWebsitePath('www.capecodplumber.com'),'/');assert.equal(events.safeWebsitePath('capecodplumber.com.evil.example/drains'),null);});

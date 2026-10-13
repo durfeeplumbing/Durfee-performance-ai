@@ -4,11 +4,11 @@ import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { serviceTitanConnectionInfo, serviceTitanGet } from '@/lib/servicetitan';
 import { safeWebsitePath } from './website-events';
 type RecordData=Record<string,any>;
-export async function syncWebsiteCalls(inspect=false){
+export async function syncWebsiteCalls(inspect=false,backfill=false){
  const info=serviceTitanConnectionInfo(),db=createSupabaseAdminClient();
  const now=new Date(),since=new Date(now.getTime()-90*86400000);
  const {data:health}=await db.from('website_sync_health').select('last_success_at').eq('name','attributed_lead').maybeSingle();
- const start=health?.last_success_at?new Date(Math.max(since.getTime(),Date.parse(health.last_success_at)-2*86400000)):since;
+ const start=!backfill&&health?.last_success_at?new Date(Math.max(since.getTime(),Date.parse(health.last_success_at)-2*86400000)):since;
  const leadPaths:string[]=[];
  for(let time=start.getTime();time<now.getTime();time+=86400000){const end=Math.min(time+86400000,now.getTime());leadPaths.push(`/marketingads/v2/tenant/{tenant}/attributed-leads?fromUtc=${encodeURIComponent(new Date(time).toISOString())}&toUtc=${encodeURIComponent(new Date(end).toISOString())}&leadType=Call`);}
  const endpoints=[

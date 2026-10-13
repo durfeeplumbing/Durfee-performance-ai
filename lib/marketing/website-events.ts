@@ -2,12 +2,12 @@ export const eventKinds = ['page_view','call_click','text_click','form_open','sc
 export type WebsiteEventKind = typeof eventKinds[number];
 export function safeWebsitePath(value: unknown): string | null {
   if (typeof value !== 'string' || value.length > 2000) return null;
-  value=value.trim();
+  let input=value.trim();
   // ServiceTitan DNI emits host/path without a URL scheme.
-  if (/^(?:www\.)?capecodplumber\.com(?:[/?#]|$)/i.test(value)) value='https://'+value;
-  if (!/^(?:\/|https:\/\/)/i.test(value)) return null;
+  if (/^(?:www\.)?capecodplumber\.com(?:[/?#]|$)/i.test(input)) input='https://'+input;
+  if (!/^(?:\/|https:\/\/)/i.test(input)) return null;
   try {
-    const url = new URL(value, 'https://capecodplumber.com');
+    const url = new URL(input, 'https://capecodplumber.com');
     if (!['capecodplumber.com','www.capecodplumber.com'].includes(url.hostname) || url.protocol !== 'https:') return null;
     return url.pathname.slice(0,512);
   } catch { return null; }

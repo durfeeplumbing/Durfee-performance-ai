@@ -21,7 +21,7 @@ export async function middleware(request:NextRequest){
   const {data:{user}}=await supabase.auth.getUser();
   if(!user)return response;
   const match=routePermissions.find(([prefix])=>path===prefix||path.startsWith(prefix+'/'));
-  if(match){const {data:allowed,error}=await supabase.rpc('has_permission_for_current_user',{p_key:match[1]});if(error||allowed!==true){const url=request.nextUrl.clone();url.pathname='/unauthorized';url.search='';url.searchParams.set('permission',match[1]);return NextResponse.redirect(url);}}
+  if(match){const {data:allowed,error}=await supabase.rpc('has_permission_for_current_user',{p_key:match[1]});if(error||allowed!==true){const url=request.nextUrl.clone();url.pathname='/unauthorized';url.search='';url.searchParams.set('permission',match[1]);const denied=NextResponse.redirect(url);response.cookies.getAll().forEach(cookie=>denied.cookies.set(cookie));denied.headers.set('Cache-Control','private, no-store');return denied;}}
   return response;
 }
 export const config={matcher:['/((?!_next/static|_next/image|favicon.ico).*)']};
